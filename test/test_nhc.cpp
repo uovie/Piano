@@ -22,8 +22,10 @@ int main(int argc, char* argv[]) {
     cano_ens_nhc_simu.open(filename);
     cano_ens_nhc_simu.read();
 
-    double T = 1 / Phy_Const::Boltzmann_const; // temperature
+    double T = 10 / Phy_Const::Boltzmann_const; // temperature
     double omega = 1;
+
+    int d = cano_ens_nhc_simu.sys.dimension;
 
     int N = 0;                              // system dimension
     for (auto i = 0; i < cano_ens_nhc_simu.sys.molecules.size(); i++)
@@ -33,18 +35,21 @@ int main(int argc, char* argv[]) {
     /*** Declare Basic Simulation Parameters                ***/
     /*** ================================================== ***/
 
-    Global::basic_simu_para bsp(10000.0, 0.00001, 1000);
+    Global::basic_simu_para bsp(5000.0, 0.0001, 1000);
 
     /*** ================================================== ***/
     /*** Declare Thermostat Variables                       ***/
     /*** ================================================== ***/
 
-    const int M = 3;                        // extented dimension
+    const int M = 4;                        // extented dimension
     std::vector<thermostat::nhc::thermo_vari> tmvs;
 
-    tmvs.push_back({ (3.0 * N), T, 0, 1 });
-    for (int j = 1; j < M; j++)
-        tmvs.push_back({ 1, T, 0, 1 });
+    tmvs.push_back({ static_cast<double>(d * N), T, 0, 1 });
+    tmvs.push_back({ 1, T, 0, -1 });
+    tmvs.push_back({ 1, T, 0, 1 });
+    tmvs.push_back({ 1, T, 0, -1 });
+    //for (int j = 1; j < M; j++)
+    //    tmvs.push_back({ 1, T, 0, 1 });
 
     /*** ================================================== ***/
     /*** Declare a Suzuki¨CYoshida scheme and initialize it ***/

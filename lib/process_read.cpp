@@ -1,5 +1,6 @@
 // file class member function "read()"
 #include <iostream>
+#include <sstream>
 #include <cassert>
 #include "../include/iostream.h"
 #include "../include/phy_const.h"
@@ -13,44 +14,57 @@ void process::read() {
 
     std::cout << "Read Infomation from " << filename << std::endl;
 
-    std::string temp_data;
+    in >> sys.dimension;
+
+    std::string line;
+    
     int mol_ctr = 0;
-    molecule mole;
-    while (!in.eof()) {
-        
-        do {
-            getline(in, temp_data);             // read redundant data
-        } while (!in.eof() && temp_data[0] != '*');
-        if (temp_data[0] != '*')
-            break;
-
-        sys.molecules.push_back(mole);
-        int num_atom;
-        in >> num_atom;
-        
-        atom atom_data;
-        double temp_q[3];
-        for (int i = 0; i < num_atom; i++) {
-            in >> atom_data.symbol >> temp_q[0] >> temp_q[1] >> temp_q[2];
-
-            atom_data.q[0] = temp_q[0] * angstrom_to_bohr;
-            atom_data.q[1] = temp_q[1] * angstrom_to_bohr;
-            atom_data.q[2] = temp_q[2] * angstrom_to_bohr;
-
-            sys.molecules[mol_ctr].atoms.push_back(atom_data);
+    molecule tmp_mole;
+    
+    while (getline(in, line)) {
+        std::string str;
+        if (line.size() >= 5) {
+            for (int a = 0; a < 5; a++)
+                str.push_back(line[a]);
         }
-
-        // identify atomic numbers and assign atomic masses
-        for (auto atom_it = sys.molecules[mol_ctr].atoms.begin(); atom_it != sys.molecules[mol_ctr].atoms.end(); atom_it++) {
-            for (auto ele_it = Atom_Data::element.begin(); ele_it != Atom_Data::element.end(); ele_it++) {
-                if ((*atom_it).symbol == *ele_it) {
-                    (*atom_it).atomic_number = (int)(ele_it - Atom_Data::element.begin()) + 1;
-                    (*atom_it).m = 1; // Atom_Data::atomic_mass[(*atom_it).atomic_number - 1];
-                    break;
+        if (str == "*****") {
+            int num_atom;
+            in >> num_atom;
+            sys.molecules.push_back(tmp_mole);
+            for (int i = 0; i < num_atom; i++) {
+                atom tmp_atom;
+                sys.molecules[mol_ctr].atoms.push_back(tmp_atom);
+                in >> sys.molecules[mol_ctr].atoms[i].symbol;
+                for (int d = 0; d < sys.dimension; d++) {
+                    double tmp_q, tmp_p, tmp_F;
+                    sys.molecules[mol_ctr].atoms[i].q.push_back(tmp_q);
+                    sys.molecules[mol_ctr].atoms[i].p.push_back(tmp_p);
+                    sys.molecules[mol_ctr].atoms[i].F.push_back(tmp_F);
+                    in >> sys.molecules[mol_ctr].atoms[i].q[d];
+                    sys.molecules[mol_ctr].atoms[i].p[d] = 1;
+                    sys.molecules[mol_ctr].atoms[i].F[d] = 0;
+                }
+            }
+            // identify atomic numbers and assign atomic masses
+            for (auto atom_it = sys.molecules[mol_ctr].atoms.begin(); atom_it != sys.molecules[mol_ctr].atoms.end(); atom_it++) {
+                for (auto ele_it = Atom_Data::element.begin(); ele_it != Atom_Data::element.end(); ele_it++) {
+                    if ((*atom_it).symbol == *ele_it) {
+                        (*atom_it).atomic_number = static_cast<int>(ele_it - Atom_Data::element.begin()) + 1;
+                        (*atom_it).m = 1; // Atom_Data::atomic_mass[(*atom_it).atomic_number - 1];
+                        break;
+                    }
                 }
             }
         }
+    }
 
-        mol_ctr++;
+    for (int mi = 0; mi < sys.molecules.size(); mi++) {
+        for (int ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
+            std::cout << "\n" << sys.molecules[mi].atoms[ai].symbol;
+            for (int di = 0; di < sys.dimension; di++) {
+                std::cout << "\t" << sys.molecules[mi].atoms[ai].q[di];
+            }
+            std::cout << "\n";
+        }
     }
 }

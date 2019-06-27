@@ -76,7 +76,7 @@ namespace nhc {
         void implement(std::ofstream& out);
 
     private:
-        int N = 0;                                      // system dimension
+        int N = 0;                                      // number of particles
         void init() {
             for (auto i = 0; i < sys.molecules.size(); i++)
                 N += static_cast<int>(sys.molecules[i].atoms.size());
@@ -90,7 +90,7 @@ namespace nhc {
 
             for (auto mi = 0; mi < sys.molecules.size(); mi++)
                 for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                    for (auto di = 0; di < 3; di++)
+                    for (auto di = 0; di < sys.dimension; di++)
                         sys.molecules[mi].atoms[ai].F[di]
                             = -1 * sys.molecules[mi].atoms[ai].m
                             * pow(omega, 2) * sys.molecules[mi].atoms[ai].q[di];
@@ -104,11 +104,11 @@ namespace nhc {
 
                 for (auto mi = 0; mi < sys.molecules.size(); mi++)
                     for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                        for (auto di = 0; di < 3; di++)
+                        for (auto di = 0; di < sys.dimension; di++)
                             kinetic_energy += pow(sys.molecules[mi].atoms[ai].p[di], 2)
                             / (2 * sys.molecules[mi].atoms[ai].m);
 
-                tmvs[0].Gamma = 2 * kinetic_energy - 3 * N * Phy_Const::Boltzmann_const * T;
+                tmvs[0].Gamma = 2 * kinetic_energy - sys.dimension * N * Phy_Const::Boltzmann_const * T;
             }
             else
                 tmvs[j].Gamma = pow(tmvs[j - 1].theta, 2) / tmvs[j - 1].mu - Phy_Const::Boltzmann_const * T;
@@ -120,30 +120,30 @@ namespace nhc {
             physic_force();
             for (auto mi = 0; mi < sys.molecules.size(); mi++)
                 for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                    for (auto di = 0; di < 3; di++)
+                    for (auto di = 0; di < sys.dimension; di++)
                         sys.molecules[mi].atoms[ai].p[di]
-                        += bsp.step_size * sys.molecules[mi].atoms[ai].F[di] / 2;
+                        += bsp.time_step_size * sys.molecules[mi].atoms[ai].F[di] / 2;
 
             for (auto mi = 0; mi < sys.molecules.size(); mi++)
                 for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                    for (auto di = 0; di < 3; di++)
+                    for (auto di = 0; di < sys.dimension; di++)
                         sys.molecules[mi].atoms[ai].q[di]
-                        += bsp.step_size * sys.molecules[mi].atoms[ai].p[di]
+                        += bsp.time_step_size * sys.molecules[mi].atoms[ai].p[di]
                         / sys.molecules[mi].atoms[ai].m;
 
             physic_force();
             for (auto mi = 0; mi < sys.molecules.size(); mi++)
                 for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                    for (auto di = 0; di < 3; di++)
+                    for (auto di = 0; di < sys.dimension; di++)
                         sys.molecules[mi].atoms[ai].p[di]
-                        += bsp.step_size * sys.molecules[mi].atoms[ai].F[di] / 2;
+                        += bsp.time_step_size * sys.molecules[mi].atoms[ai].F[di] / 2;
         }
 
         // thermostat propagation
         void thermo_propagate(void)
         {
             for (auto wi = 0; wi < tfs.n_sy; wi++) {
-                double tmp_delta = tfs.weight[wi] * bsp.step_size / tfs.n_ff;
+                double tmp_delta = tfs.weight[wi] * bsp.time_step_size / tfs.n_ff;
                 for (auto ni = 0; ni < tfs.n_ff; ni++) {
 
                     thermo_force(M - 1);
@@ -163,7 +163,7 @@ namespace nhc {
                     double momen_scale = exp(-1 * tmp_delta * tmvs[0].theta / (2 * tmvs[0].mu));
                     for (auto mi = 0; mi < sys.molecules.size(); mi++)
                         for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                            for (auto di = 0; di < 3; di++)
+                            for (auto di = 0; di < sys.dimension; di++)
                                 sys.molecules[mi].atoms[ai].p[di] *= momen_scale;
                     
                     for (int j = 0; j < M - 1; j++) {

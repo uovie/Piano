@@ -13,9 +13,9 @@ namespace Global {
         std::string symbol;                 // atomic symbol
         int atomic_number;                  // atomic number
         double m;                           // atomic mass
-        double q[3];                        // atomic position
-        double p[3] = { 1,1,1 };            // atomic momentum
-        double F[3];                        // force acting on atom
+        std::vector<double> q;              // atomic position
+        std::vector<double> p;              // atomic momentum
+        std::vector<double> F;              // force acting on atom
     };
 
     class molecule {
@@ -25,6 +25,7 @@ namespace Global {
 
     class system {
     public:
+        int dimension;
         std::vector<molecule> molecules;
     };
 }   // Global

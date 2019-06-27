@@ -21,8 +21,8 @@ namespace Global {
         void open(const std::string& file_name) {
             // check the extension
             filename = file_name;
-            if (filename.rfind(".xyz") == std::string::npos)
-                throw std::invalid_argument("Only .xyz file is a valid input file.");
+            if (filename.rfind(".vie") == std::string::npos)
+                throw std::invalid_argument("Only .vie file is a valid input file.");
 
             in.open(filename);
 

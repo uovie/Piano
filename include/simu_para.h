@@ -10,10 +10,10 @@ namespace Global {
     public:
         basic_simu_para() = default;
         basic_simu_para(double rt, double ss, int dcp):
-            run_time(rt), step_size(ss), data_coll_peri(dcp) { }
+            run_time(rt), time_step_size(ss), data_coll_peri(dcp) { }
 
         double run_time;                    // run time
-        double step_size;                   // step size
+        double time_step_size;              // step size
         int data_coll_peri;                 // data collection period
     };
     

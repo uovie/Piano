@@ -25,7 +25,6 @@ namespace nhc {
         
         // print NHC procedure data
         print_nhc_procedure_data(out, sys, t);
-
         const auto tstart = std::chrono::high_resolution_clock::now();
 
         do {
@@ -39,7 +38,7 @@ namespace nhc {
                 ctr = 0;
             }
             ctr++;
-            t += bsp.step_size;
+            t += bsp.time_step_size;
         } while (t <= bsp.run_time);
 
         const auto tstop = std::chrono::high_resolution_clock::now();
@@ -53,16 +52,16 @@ namespace nhc {
 
     // print NHC procedure title
     void print_nhc_procedure_title(std::ofstream& out, Global::system& sys, double& t) {
-        std::cout << "\n\nNHC Procedure:\nTime";
+        std::cout << "\n\nNHC Procedure:\n   Time";
         out << "\n\nNHC Procedure:\nTime";
 
         for (int mi = 0; mi < sys.molecules.size(); mi++) {
             for (int ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                for (int di = 0; di < 3; di++) {
-                    std::cout << "\tm[" << mi + 1 << "].a[" << ai + 1 << "].q[" << di + 1 << "]";
+                for (int di = 0; di < sys.dimension; di++) {
+                    std::cout << "    m[" << mi + 1 << "].a[" << ai + 1 << "].q[" << di + 1 << "]";
                     out << "\tm[" << mi + 1 << "].a[" << ai + 1 << "].q[" << di + 1 << "]";
                 }
-                for (int di = 0; di < 3; di++) {
+                for (int di = 0; di < sys.dimension; di++) {
                     std::cout << "\tm[" << mi + 1 << "].a[" << ai + 1 << "].p[" << di + 1 << "]";
                     out << "\tm[" << mi + 1 << "].a[" << ai + 1 << "].p[" << di + 1 << "]";
                 }
@@ -79,11 +78,11 @@ namespace nhc {
         out << std::setprecision(8);
         for (int mi = 0; mi < sys.molecules.size(); mi++) {
             for (int ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                for (int di = 0; di < 3; di++) {
+                for (int di = 0; di < sys.dimension; di++) {
                     std::cout << std::setw(15) << sys.molecules[mi].atoms[ai].q[di];
                     out << "\t" << sys.molecules[mi].atoms[ai].q[di];
                 }
-                for (int di = 0; di < 3; di++) {
+                for (int di = 0; di < sys.dimension; di++) {
                     std::cout << std::setw(15) << sys.molecules[mi].atoms[ai].p[di];
                     out << "\t" << sys.molecules[mi].atoms[ai].p[di];
                 }

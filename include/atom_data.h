@@ -6,7 +6,7 @@
 #include <string>
 
 namespace uovie {
-namespace Atom_Data {
+namespace atom_data {
 
 #define ELEMENT_NUM_MAX 118
     

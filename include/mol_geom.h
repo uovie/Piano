@@ -26,6 +26,10 @@ namespace Global {
     class system {
     public:
         int dimension;
+        int num_part;
+        double volume;
+        double temperature;
+        double pressure;
         std::vector<molecule> molecules;
     };
 }   // Global

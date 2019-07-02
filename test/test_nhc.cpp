@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+
 #include <cassert>
 
 #include "../include/process.h"
@@ -21,34 +22,26 @@ int main(int argc, char* argv[]) {
     simulation.open(argv[1]);
     simulation.read();
 
-    int& d = simulation.sys.dimension;
-    int& N = simulation.sys.num_part;
-    double& T = simulation.sys.temperature;
-
     /*** ================================================== ***/
-    /*** Thermostat variables Declaration                   ***/
+    /*** Thermostat variables Generation                    ***/
     /*** ================================================== ***/
 
     std::vector<thermostat::nhc::thermo_vari> tmvs;
-    tmvs.push_back({ static_cast<double>(d * N), T, 0, 1 });
-    //tmvs.push_back({ 1, T, 0, -1 });
-    //tmvs.push_back({ 1, T, 0, 1 });
-    //tmvs.push_back({ 1, T, 0, -1 });
-
+    thermostat::nhc::thermo_vari_generator(simulation.sys, tmvs, 4, 1);
+    
     /*** ================================================== ***/
     /*** Thermostat Factorization Scheme Declaration        ***/
     /*** ================================================== ***/
 
     thermostat::nhc::thermo_factor_scheme tfs(7, 1);
-    tfs.init();
 
     /*** ================================================== ***/
     /*** NHC Simulation Execution                           ***/
     /*** ================================================== ***/
 
-    thermostat::nhc::nhc_procedure nhc_proce(simulation.bsp,
+    thermostat::nhc::nhc_procedure_base nhc_proce(simulation.bsp,
         simulation.sys, tmvs, tfs);
-    nhc_proce.implement(simulation.out, 1);
+    nhc_proce.implement(simulation.out);
 
     /*** ================================================== ***/
     /*** Simulation termination                             ***/

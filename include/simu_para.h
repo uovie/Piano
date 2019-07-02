@@ -2,7 +2,6 @@
 #ifndef SIMU_PARA_H_
 #define SIMU_PARA_H_
 
-
 namespace uovie {
 namespace Global {
 
@@ -15,5 +14,4 @@ namespace Global {
     
 }   // Global
 }   // uovie
-
 #endif

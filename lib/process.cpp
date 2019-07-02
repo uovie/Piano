@@ -1,6 +1,8 @@
 #include <iostream>
 #include <sstream>
+#include <random>
 #include <cassert>
+
 #include "../include/process.h"
 #include "../include/simu_para.h"
 #include "../include/phy_const.h"
@@ -37,9 +39,12 @@ void process::read() {
     in >> job >> bsp.run_time >> bsp.time_step_size >> bsp.data_coll_peri;
     in >> sys.dimension >> sys.volume >> sys.temperature >> sys.pressure;
 
-    std::string line;
+    const double k = phy_const::Boltzmann_const;
+    const double& T = sys.temperature;
     
-    int mol_ctr = 0;
+    int mol_ctr = 0; int& mi = mol_ctr;
+    std::mt19937 mte(36);
+    std::string line;
     molecule tmp_mole;
     
     while (getline(in, line)) {
@@ -49,31 +54,32 @@ void process::read() {
                 str.push_back(line[a]);
         }
         if (str == "*****") {
-            int num_atom;
-            in >> num_atom;
+            int natom;
+            in >> natom;
             sys.molecules.push_back(tmp_mole);
-            for (int i = 0; i < num_atom; i++) {
+            for (int ai = 0; ai < natom; ai++) {
                 atom tmp_atom;
-                sys.molecules[mol_ctr].atoms.push_back(tmp_atom);
-                in >> sys.molecules[mol_ctr].atoms[i].symbol;
-                for (int d = 0; d < sys.dimension; d++) {
-                    double tmp_q, tmp_p, tmp_F;
-                    sys.molecules[mol_ctr].atoms[i].q.push_back(tmp_q);
-                    sys.molecules[mol_ctr].atoms[i].p.push_back(tmp_p);
-                    sys.molecules[mol_ctr].atoms[i].F.push_back(tmp_F);
-                    in >> sys.molecules[mol_ctr].atoms[i].q[d];
-                    sys.molecules[mol_ctr].atoms[i].p[d] = 1;
-                    sys.molecules[mol_ctr].atoms[i].F[d] = 0;
+                sys.molecules[mi].atoms.push_back(tmp_atom);
+                in >> sys.molecules[mi].atoms[ai].symbol;
+                for (int di = 0; di < sys.dimension; di++) {
+                    double tmp_q;
+                    sys.molecules[mi].atoms[ai].q.push_back(tmp_q);
+                    in >> sys.molecules[mi].atoms[ai].q[di];
                 }
             }
-            // identify atomic numbers and assign atomic masses
-            for (auto atom_it = sys.molecules[mol_ctr].atoms.begin(); atom_it != sys.molecules[mol_ctr].atoms.end(); atom_it++) {
-                for (auto ele_it = atom_data::element.begin(); ele_it != atom_data::element.end(); ele_it++) {
-                    if ((*atom_it).symbol == *ele_it) {
-                        (*atom_it).atomic_number = static_cast<int>(ele_it - atom_data::element.begin()) + 1;
-                        (*atom_it).m = 1; // Atom_Data::atomic_mass[(*atom_it).atomic_number - 1];
+            // identify atomic numbers and assign atomic masses, momentums, forces
+            for (int ai = 0; ai < natom; ai++) {
+                for (int ei = 0; ei < atom_data::element.size(); ei++) {
+                    if (sys.molecules[mi].atoms[ai].symbol == atom_data::element[ei]) {
+                        sys.molecules[mi].atoms[ai].atomic_number = ei + 1;
+                        sys.molecules[mi].atoms[ai].m = atom_data::atomic_mass[ei];
                         break;
                     }
+                }
+                std::normal_distribution<double> ndrm{ 0, sqrt(k * T * sys.molecules[mi].atoms[ai].m) };
+                for (int di = 0; di < sys.dimension; di++) {
+                    sys.molecules[mi].atoms[ai].p.push_back(ndrm(mte));
+                    sys.molecules[mi].atoms[ai].F.push_back(0);
                 }
             }
             mol_ctr++;

@@ -16,14 +16,6 @@ namespace pimd {
 
     };
 
-    class ficti_vari {
-    public:
-        std::vector<double> m_tilde;
-        std::vector<double> r;
-        std::vector<double> s;
-        std::vector<double> m_bar;
-        
-    };
 
     class pimd_procedure {
     public:
@@ -31,43 +23,21 @@ namespace pimd {
         pimd_procedure(Global::system& s) : sys(s) { }
 
         Global::system sys;
-        std::vector<ficti_vari> fvs;
 
 
         // void implement(std::ofstream& out);
 
     private:
+        int& d = sys.dimension;
+        int& N = sys.num_part;
+        double k = phy_const::Boltzmann_const;
+        double& T = sys.temperature;
+
         // inverse staging transformayion
 
 
-        // nhc
-        
 
-        /*** ================================================== ***/
-        /*** Thermostat variables Declaration                   ***/
-        /*** ================================================== ***/
-
-        std::vector<thermostat::nhc::thermo_vari> tmvs;
-        tmvs.push_back({ static_cast<double>(d * N), T, 0, 1 });
-        tmvs.push_back({ 1, T, 0, -1 });
-        tmvs.push_back({ 1, T, 0, 1 });
-        tmvs.push_back({ 1, T, 0, -1 });
-
-        /*** ================================================== ***/
-        /*** Thermostat Factorization Scheme Declaration        ***/
-        /*** ================================================== ***/
-
-        thermostat::nhc::thermo_factor_scheme tfs(7, 1);
-        tfs.init();
-
-        /*** ================================================== ***/
-        /*** NHC Simulation Execution                           ***/
-        /*** ================================================== ***/
-
-        thermostat::nhc::nhc_procedure nhc_proce(simulation.bsp,
-            simulation.sys, tmvs, tfs);
-        nhc_proce.implement(simulation.out);
-
+        void do_nhc(const int& bi);
 
 
 

@@ -1,0 +1,33 @@
+\documentclass[a4paper,11pt]{article}
+
+% define the title
+\author{Haoyu Lin}
+\title{Lennard-Jones Potential}
+\begin{document}
+
+% generates the title
+\maketitle
+
+% insert the table of contents
+%\tableofcontents
+
+\section{Lennard-Jones Potential}
+A Lennard-Jones (LJ) potential $V(r_{ij})$ between two atoms placed at distance $r_{ij} = |\mathbf{r}_j - \mathbf{r}_i|$ is defined by:
+\begin{equation}
+    V(r_{ij}) = 4 \epsilon \left[ \left( \frac{\sigma}{r_{ij}} \right)^{12} - \left( \frac{\sigma}{r_{ij}} \right)^{6} \right].
+\end{equation}
+And the force on atom $i$ produced by LJ potetial is
+\begin{equation}
+    \mathbf{F}_i = - \frac{24 \epsilon}{r_{ij}} \left[ 2\left( \frac{\sigma}{r_{ij}} \right)^{12} - \left( \frac{\sigma}{r_{ij}} \right)^{6} \right] \hat{\mathbf{r}}_{ij},
+\end{equation}
+where
+\begin{equation}
+    \hat{\mathbf{r}}_{ij} = \frac{\mathbf{r}_{ij}}{r_{ij}} = \frac{x_{ij}\hat{\mathbf{x}} + y_{ij}\hat{\mathbf{y}} + z_{ij}\hat{\mathbf{z}}}{\sqrt{x_{ij}^2 + y_{ij}^2 + z_{ij}^2}}.
+\end{equation}
+Similarly, the force on atom $j$ is
+\begin{equation}
+    \mathbf{F}_j = \frac{24 \epsilon}{r_{ij}} \left[ 2\left( \frac{\sigma}{r_{ij}} \right)^{12} - \left( \frac{\sigma}{r_{ij}} \right)^{6} \right] \hat{\mathbf{r}}_{ij},
+\end{equation}
+which is just opposite to $\mathbf{F}_i$.
+
+\end{document}

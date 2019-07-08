@@ -28,7 +28,7 @@ namespace phy_const {
     constexpr auto chara_imped_vac = 376.730313461; // ("characteristic impedance of vacuum", "Z0", 376.730313461, "Omega", 0)
     constexpr auto Newton_gravvi_const = 6.67408e-11; // ("Newtonian constant of gravitation", "G", 6.67408e-11, "m3 kg−1 s−2", 4.7e-5)
     constexpr auto Planck_const = 6.626070040e-34;// ("Planck constant", "h", 6.626070040e-34, "J s", 1.2e-8)
-    constexpr auto red_Planck_const = 1.054571800e-34; // ("reduced Planck constant", "h_bar", 1.054571800e-34, "J s", 1.2e-8)
+    constexpr auto red_Planck_const = 1/*1.054571800e-34*/; // ("reduced Planck constant", "h_bar", 1.054571800e-34, "J s", 1.2e-8)
     constexpr auto Planck_mass = 2.176470e-8; // ("Planck mass", "mp", 2.176470e-8, "kg", 2.3e-5)
     constexpr auto Planck_ener = 1.220910e19; // ("Planck energy", "mpc2", 1.220910e19, "GeV", 2.3e-5)
     constexpr auto Planck_temp = 1.416808e32; // ("Planck temperature", "Tp", 1.416808e32, "K", 2.3e-5)
@@ -57,13 +57,20 @@ namespace phy_const {
      * The values in SI units of some non-SI units based on the 2014 CODATA adjustment of the values of the constants.
      */
 
-     /*** ========================================= ***/
-     /*** Non-SI units accepted for use with the SI ***/
-     /*** ========================================= ***/
+    /*** ========================================= ***/
+    /*** Non-SI units accepted for use with the SI ***/
+    /*** ========================================= ***/
 
     constexpr auto a_u_length = 0.52917721067e-10; // ("a.u. of length: Bohr radius (bohr)", "a0", 0.52917721067e-10, "m", 2.3e-10)
 
-}   // Phy_Const
-}   // uovie
+    /*** ========================================= ***/
+    /*** Atomic units (a.u.)                       ***/
+    /*** ========================================= ***/
+
+    constexpr auto a_u_action = 1.054571800e-34; // ("a.u. of action: h/2pi", "h_bar", 1.054571800e-34, "J s", 1.2e-8)
+
+
+} // !phy_const
+} // !uovie
 
 #endif

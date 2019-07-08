@@ -6,8 +6,8 @@
 #include <random>
 #include <chrono>
 
-#include "../../include/simu_para.h"
-#include "../../include/thermostat/nhc.h"
+#include "simu_para.h"
+#include "thermostat/nhc.h"
 
 namespace uovie {
 namespace thermostat {
@@ -45,8 +45,9 @@ namespace nhc {
     /*** ================================================== ***/
 
     // calculate physical forces (tmp, simple harmonic)
-    void nhc_procedure_base::calc_physic_force()
+    void nhc_procedure::calc_physic_force()
     {
+        double omega = 1;
         for (auto mi = 0; mi < sys.molecules.size(); mi++)
             for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
                 for (auto di = 0; di < d; di++)
@@ -55,7 +56,7 @@ namespace nhc {
                     * pow(omega, 2) * sys.molecules[mi].atoms[ai].q[di];
     }
 
-    void nhc_procedure_base::calc_thermo_force(const int& j)
+    void nhc_procedure::calc_thermo_force(const int& j)
     {
         if (j == 0) {
             kine_energy = 0.0;
@@ -71,7 +72,7 @@ namespace nhc {
             tmvs[j].Gamma = pow(tmvs[j - 1].theta, 2) / tmvs[j - 1].mu - k * T;
     }
 
-    void nhc_procedure_base::physic_propagate()
+    void nhc_procedure::physic_propagate()
     {
         calc_physic_force();
         for (auto mi = 0; mi < sys.molecules.size(); mi++)
@@ -95,7 +96,7 @@ namespace nhc {
                     += bsp.time_step_size * sys.molecules[mi].atoms[ai].F[di] / 2;
     }
 
-    void nhc_procedure_base::thermo_propagate()
+    void nhc_procedure::thermo_propagate()
     {
         for (auto wi = 0; wi < tfs.nsy(); wi++) {
             double tmp_delta = tfs.w(wi) * bsp.time_step_size / tfs.nff();
@@ -135,10 +136,12 @@ namespace nhc {
         }
     }
 
-    void nhc_procedure_base::calc_cons_energy()
+    void nhc_procedure::calc_syco_energy()
     {
         kine_energy = 0.0;
         pote_energy = 0.0;
+
+        double omega = 1;
         for (auto mi = 0; mi < sys.molecules.size(); mi++) {
             for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
                 for (auto di = 0; di < d; di++) {
@@ -153,10 +156,11 @@ namespace nhc {
         for (int j = 1; j < M; j++) {
             ther_energy += pow(tmvs[j].theta, 2) / (2 * tmvs[j].mu) + k * T * tmvs[j].eta;
         }
+        syst_energy = kine_energy + pote_energy;
         cons_energy = kine_energy + pote_energy + ther_energy;
     }
 
-    void nhc_procedure_base::print_nhc_procedure_title(std::ofstream& out) {
+    void nhc_procedure::print_nhc_procedure_title(std::ofstream& out) {
         std::cout << "\n\nNHC Procedure:\n   Time";
         out << "\n\nNHC Procedure:\nTime";
 
@@ -176,7 +180,7 @@ namespace nhc {
         out << "\tcons_energy";
     }
 
-    void nhc_procedure_base::print_nhc_procedure_data(std::ofstream& out, double& t) {
+    void nhc_procedure::print_nhc_procedure_data(std::ofstream& out, double& t) {
         std::cout << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
         out << "\n" << std::fixed << std::setprecision(5) << t;
 
@@ -198,25 +202,21 @@ namespace nhc {
         out << "\t" << cons_energy;
     }
 
-    void nhc_procedure_base::implement() {
-        const auto tstart = std::chrono::high_resolution_clock::now();
+    void nhc_procedure::implement() {
         for (double t = 0; t <= bsp.run_time; t += bsp.time_step_size) {
             thermo_propagate();
             physic_propagate();
             thermo_propagate();
             t += bsp.time_step_size;
         }
-        const auto tstop = std::chrono::high_resolution_clock::now();
-        const std::chrono::duration<double> time_elapsed = tstop - tstart;
-        std::cout << "\nElapsed time of NHC procedure (s): " << time_elapsed.count() << std::endl;
     }
     
-    void nhc_procedure_base::implement(std::ofstream& out) {
+    void nhc_procedure::implement(std::ofstream& out) {
         double t = 0;
         int ctr = 0;
         
         print_nhc_procedure_title(out);
-        calc_cons_energy();
+        calc_syco_energy();
         print_nhc_procedure_data(out, t);
 
         const auto tstart = std::chrono::high_resolution_clock::now();
@@ -227,7 +227,7 @@ namespace nhc {
             thermo_propagate();
             
             if (ctr == bsp.data_coll_peri) {
-                calc_cons_energy();
+                calc_syco_energy();
                 print_nhc_procedure_data(out, t);
                 ctr = 0;
             }
@@ -245,25 +245,92 @@ namespace nhc {
     /*** NHC Procedure for PIMD Class Member Functions      ***/
     /*** ================================================== ***/
 
-    /*void nhc_procedure_for_pimd::calc_physic_force() {
+    void nhc_procedure_for_pimd::calc_physic_force()
+    {
+        double omega = 1;
+
         for (auto mi = 0; mi < sys.molecules.size(); mi++) {
             for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
                 for (auto di = 0; di < d; di++) {
-                    if (bi == 0)
-                        sys.molecules[mi].atoms[ai].F[di] = 0;
-                    else
-                        sys.molecules[mi].atoms[ai].F[di]
-                        = - ((bi + 1) / bi) * sys.molecules[mi].atoms[ai].m
-                        *pow(fic_omega, 2) * sys.molecules[mi].atoms[ai].q[di];
-                    
+                    st_syss[0].molecules[mi].atoms[ai].F[di] = 0;
+                    for (auto bj = 0; bj < nbead; bj++) {
+                        st_syss[0].molecules[mi].atoms[ai].F[di] -= pr_syss[bj].molecules[mi].atoms[ai].m
+                            * pow(omega, 2) * pr_syss[bj].molecules[mi].atoms[ai].q[di];
+                    }
+                    st_syss[0].molecules[mi].atoms[ai].F[di] /= nbead;
+                }
+            }
+        }
+
+        for (auto bi = 1; bi < nbead; bi++) {
+            for (auto mi = 0; mi < sys.molecules.size(); mi++) {
+                for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
+                    for (auto di = 0; di < d; di++) {
+                        st_syss[bi].molecules[mi].atoms[ai].F[di]
+                            = -st_syss[bi].molecules[mi].atoms[ai].m
+                            * pow(fic_omega, 2) * st_syss[bi].molecules[mi].atoms[ai].q[di]
+                            - (pr_syss[bi].molecules[mi].atoms[ai].m * pow(omega, 2)
+                                * pr_syss[bi].molecules[mi].atoms[ai].q[di] + ((bi - 1) / bi)
+                                * pr_syss[bi - 1].molecules[mi].atoms[ai].m * pow(omega, 2)
+                                * pr_syss[bi - 1].molecules[mi].atoms[ai].q[di]) / nbead;
+                    }
                 }
             }
         }
     }
 
-    void nhc_procedure_for_pimd::calc_cons_energy() {
-        ;
-    }*/
+    void nhc_procedure_for_pimd::calc_syco_energy() {
+        double omega = 1;
+
+        kine_energy = 0.0;
+        for (auto mi = 0; mi < sys.molecules.size(); mi++)
+            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
+                for (auto di = 0; di < d; di++)
+                    kine_energy += pow(st_syss[bi].molecules[mi].atoms[ai].p[di], 2)
+                        / (2 * st_syss[bi].molecules[mi].atoms[ai].m);
+
+        pote_energy = 0.0;
+        for (auto mi = 0; mi < sys.molecules.size(); mi++) {
+            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
+                for (auto di = 0; di < d; di++) {
+                    for (auto bj = 0; bj < nbead; bj++) {
+                        pote_energy += 0.5 * st_syss[bj].molecules[mi].atoms[ai].m
+                            * pow(omega, 2) * pow(st_syss[bj].molecules[mi].atoms[ai].q[di], 2);
+                    }
+                    pote_energy /= nbead;
+                }
+            }
+        }
+
+        for (auto bi = 1; bi < nbead; bi++) {
+            for (auto mi = 0; mi < sys.molecules.size(); mi++) {
+                for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
+                    for (auto di = 0; di < d; di++) {
+                        pote_energy
+                            = pote_energy + 0.5 * st_syss[bi].molecules[mi].atoms[ai].m
+                            * pow(fic_omega, 2) * pow(st_syss[bi].molecules[mi].atoms[ai].q[di], 2)
+                            + 0.5 * (pr_syss[bi].molecules[mi].atoms[ai].m * pow(omega, 2)
+                                * pow(pr_syss[bi].molecules[mi].atoms[ai].q[di], 2) + ((bi - 1) / bi)
+                                * pr_syss[bi - 1].molecules[mi].atoms[ai].m * pow(omega, 2)
+                                * pow(pr_syss[bi - 1].molecules[mi].atoms[ai].q[di], 2)) / nbead;
+                    }
+                }
+            }
+        }
+
+        ther_energy = pow(tmvs[0].theta, 2) / (2 * tmvs[0].mu) + d * N * k * T * tmvs[0].eta;
+        for (int j = 1; j < M; j++) {
+            ther_energy += pow(tmvs[j].theta, 2) / (2 * tmvs[j].mu) + k * T * tmvs[j].eta;
+        }
+        syst_energy = kine_energy + pote_energy;
+        cons_energy = kine_energy + pote_energy + ther_energy;
+    }
+
+    void nhc_procedure_for_pimd::imple_one_step() {
+        thermo_propagate();
+        physic_propagate();
+        thermo_propagate();
+    }
 
 } // !nhc
 } // !thermostat

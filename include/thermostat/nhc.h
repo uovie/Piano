@@ -8,17 +8,19 @@
 #include <cmath>
 
 // uovie headers
-#include "../simu_para.h"
-#include "../phy_const.h"
-#include "../mol_geom.h"
+#include "simu_para.h"
+#include "phy_const.h"
+#include "mol_geom.h"
+
+
 
 namespace uovie {
 namespace thermostat {
 namespace nhc {
 
-    /*** ==================== ***/
-    /*** Thermostat Variables ***/
-    /*** ==================== ***/
+    /*** ================================================== ***/
+    /*** Thermostat Variables                               ***/
+    /*** ================================================== ***/
 
     class thermo_vari {
     public:
@@ -32,12 +34,17 @@ namespace nhc {
         double Gamma;                   // thermostat force
     };
 
+    class thermo_vari_coll {
+    public:
+        std::vector<thermostat::nhc::thermo_vari> tmvc;
+    };
+
     void thermo_vari_generator(const Global::system& sys,
         std::vector<thermo_vari>& tmvs, int M, double tau);
     
-    /*** =============================== ***/
-    /*** Thermostat Factorization Scheme ***/
-    /*** =============================== ***/
+    /*** ================================================== ***/
+    /*** Thermostat Factorization Scheme                    ***/
+    /*** ================================================== ***/
 
     // Suzuki¨CYoshida scheme
     class thermo_factor_scheme {
@@ -64,38 +71,37 @@ namespace nhc {
     };
 
     /*** ================================================== ***/
-    /*** NHC Procedure Base                                 ***/
+    /*** NHC Procedure                                      ***/
     /*** ================================================== ***/
 
-    class nhc_procedure_base {
+    class nhc_procedure {
     public:
-        nhc_procedure_base() = default;
-        nhc_procedure_base(const Global::basic_simu_para& b, Global::system& s,
-            std::vector<thermo_vari>& tvs, const thermo_factor_scheme& fs) :
-            bsp(b), sys(s), tmvs(tvs), tfs(fs) { }
-        //~nhc_procedure_base();
+        nhc_procedure() = default;
+        nhc_procedure(const Global::basic_simu_para& b, Global::system& s,
+            std::vector<thermo_vari>& t, const thermo_factor_scheme& f) :
+            bsp(b), sys(s), tmvs(t), tfs(f) { }
+        ~nhc_procedure() { }
         
+        void implement();
+        void implement(std::ofstream& out);
+        double sys_ene() const { return syst_energy; }
+
+    protected:
         const Global::basic_simu_para& bsp;
         Global::system& sys;
         std::vector<thermo_vari>& tmvs;
         const thermo_factor_scheme& tfs;
-        
-        void implement();
-        void implement(std::ofstream& out);
 
-    private:
-        double omega = 1;
-
-    protected:
         const int& d = sys.dimension;
         const int& N = sys.num_part;
-        const double k = phy_const::Boltzmann_const;
+        const double k = uovie::phy_const::Boltzmann_const;
         const double& T = sys.temperature;
         const int M = tmvs.size();          // extented dimension
 
         double kine_energy;
         double pote_energy;
         double ther_energy;
+        double syst_energy;
         double cons_energy;
 
         virtual void calc_physic_force();
@@ -103,7 +109,7 @@ namespace nhc {
         void physic_propagate();
         void thermo_propagate();
 
-        virtual void calc_cons_energy();
+        virtual void calc_syco_energy();
 
         void print_nhc_procedure_title(std::ofstream& out);
         void print_nhc_procedure_data(std::ofstream& out, double& t);
@@ -113,22 +119,30 @@ namespace nhc {
     /*** NHC Procedure for PIMD                             ***/
     /*** ================================================== ***/
 
-    //class nhc_procedure_for_pimd : public nhc_procedure_base {
-    //public:
-    //    nhc_procedure_for_pimd() = default;
-    //    nhc_procedure_for_pimd(Global::basic_simu_para& b, Global::system& s,
-    //        std::vector<thermo_vari>& tvs, thermo_factor_scheme& fs, const int& i) :
-    //        bsp(b), sys(s), tmvs(tvs), tfs(fs), bi(i) { }
+    class nhc_procedure_for_pimd : public nhc_procedure {
+    public:
+        nhc_procedure_for_pimd() = default;
+        nhc_procedure_for_pimd(const Global::basic_simu_para& b, Global::system& s,
+            std::vector<thermo_vari>& t, const thermo_factor_scheme& f,
+            std::vector<Global::system>& prs, std::vector<Global::system>& sts, const int i):
+            nhc_procedure(b, s, t, f), pr_syss(prs), st_syss(sts), bi(i) { }
 
-    //private:
-    //    const int bi;    // bead index
-    //    double fic_omega;
+        void imple_one_step();
+        void calc_syco_energy() override;
 
-    //    void calc_physic_force() override;
-    //    void calc_cons_energy() override;
-    //};
+    private:
+        const double h_bar = uovie::phy_const::red_Planck_const;
+        std::vector<Global::system>& pr_syss;
+        std::vector<Global::system>& st_syss;
+        const int nbead = pr_syss.size();
+        const double fic_omega = k * T * sqrt(nbead) / h_bar;
+        const int bi;    // bead index
 
-}   // nhc
-}   // thermostat
-}   // uovie
+        void calc_physic_force() override;
+        
+    };
+
+} // !nhc
+} // !thermostat
+} // !uovie
 #endif

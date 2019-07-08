@@ -1,11 +1,9 @@
 CC      := g++
-INCS    := -I ../include \
-           -I ../include/thermostat
-LIBS    := -L ../lib \
-           -L ../lib/thermostat
+INCS    := -I ../include
+LIBS    := -L ../lib
 
 TARGETS := Piano
-OBJ     := test_nhc.o process.o nhc.o
+OBJ     := test_pimd.o uov_proc.o nhc.o pimd.o
 DEPS    := 
 
 .PHONY: all clean

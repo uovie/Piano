@@ -4,10 +4,10 @@
 
 #include <cassert>
 
-#include "../include/process.h"
-#include "../include/simu_para.h"
-#include "../include/phy_const.h"
-#include "../include/thermostat/nhc.h"
+#include "uov_proc.h"
+#include "simu_para.h"
+#include "phy_const.h"
+#include "thermostat/nhc.h"
 
 using namespace uovie;
 
@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     /*** NHC Simulation Execution                           ***/
     /*** ================================================== ***/
 
-    thermostat::nhc::nhc_procedure_base nhc_proce(simulation.bsp,
+    thermostat::nhc::nhc_procedure nhc_proce(simulation.bsp,
         simulation.sys, tmvs, tfs);
     nhc_proce.implement(simulation.out);
 

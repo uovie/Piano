@@ -2,221 +2,719 @@
 #include <iostream>
 #include <iomanip>
 #include <cassert>
-#include <cmath>
-#include <random>
 #include <chrono>
+#include <random>
 
-#include "simu_para.h"
+// uovie headers
 #include "thermostat/nhc.h"
+#include "model.h"
 
 namespace uovie {
 namespace thermostat {
 namespace nhc {
 
-    /*** ================================================== ***/
-    /*** Thermostat Variables Generator                     ***/
-    /*** ================================================== ***/
+    std::mt19937 s_mte(36);
+    std::mt19937 theta_mte(27);
 
-    void thermo_vari_generator(const Global::system& sys,
-        std::vector<thermo_vari>& tmvs, const int M, const double tau)
-    {
-        const int& d = sys.dimension;
-        const int& N = sys.num_part;
-        const double k = phy_const::Boltzmann_const;
-        const double& T = sys.temperature;
-
-        double tmp_mu0 = d * N * k * T * pow(tau, 2);
-        double tmp_mu1 = k * T * pow(tau, 2);
-
-        std::mt19937 mte(27);
-        std::normal_distribution<double> ndrm0{ 0, sqrt(k * T * tmp_mu0) };
-        std::normal_distribution<double> ndrm1{ 0, sqrt(k * T * tmp_mu1) };
-        
-        for (int j = 0; j < M; j++) {
-            if (j == 0)
-                tmvs.push_back(thermostat::nhc::thermo_vari(tmp_mu0, 0, ndrm0(mte)));
-            else
-                tmvs.push_back(thermostat::nhc::thermo_vari(tmp_mu1, 0, ndrm1(mte)));
-        }
-    }
+    //--------------------------------------------------------//
 
     /*** ================================================== ***/
-    /*** NHC Procedure Base Class Member Functions          ***/
+    /*** NHC Procedure (Global) Class Member Functions      ***/
     /*** ================================================== ***/
 
-    // calculate physical forces (tmp, simple harmonic)
-    void nhc_procedure::calc_physic_force()
+    // initialization
+    void nhc_procedure_global::initialize()
     {
-        double omega = 1;
-        for (auto mi = 0; mi < sys.molecules.size(); mi++)
-            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                for (auto di = 0; di < d; di++)
-                    sys.molecules[mi].atoms[ai].F[di]
-                    = -1 * sys.molecules[mi].atoms[ai].m
-                    * pow(omega, 2) * sys.molecules[mi].atoms[ai].q[di];
-    }
+        // resize arrays
+        m.resize(d * N);
+        q.resize(d * N);
+        p.resize(d * N);
+        F.resize(d * N);
 
-    void nhc_procedure::calc_thermo_force(const int& j)
-    {
-        if (j == 0) {
-            kine_energy = 0.0;
-            for (auto mi = 0; mi < sys.molecules.size(); mi++)
-                for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                    for (auto di = 0; di < d; di++)
-                        kine_energy += pow(sys.molecules[mi].atoms[ai].p[di], 2)
-                        / (2 * sys.molecules[mi].atoms[ai].m);
+        mu.resize(M);
+        eta.resize(M);
+        theta.resize(M);
+        Gamma.resize(M);
 
-            tmvs[0].Gamma = 2 * kine_energy - d * N * k * T;
-        }
-        else
-            tmvs[j].Gamma = pow(tmvs[j - 1].theta, 2) / tmvs[j - 1].mu - k * T;
-    }
-
-    void nhc_procedure::physic_propagate()
-    {
-        calc_physic_force();
-        for (auto mi = 0; mi < sys.molecules.size(); mi++)
-            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                for (auto di = 0; di < d; di++)
-                    sys.molecules[mi].atoms[ai].p[di]
-                    += bsp.time_step_size * sys.molecules[mi].atoms[ai].F[di] / 2;
-
-        for (auto mi = 0; mi < sys.molecules.size(); mi++)
-            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                for (auto di = 0; di < d; di++)
-                    sys.molecules[mi].atoms[ai].q[di]
-                    += bsp.time_step_size * sys.molecules[mi].atoms[ai].p[di]
-                    / sys.molecules[mi].atoms[ai].m;
-
-        calc_physic_force();
-        for (auto mi = 0; mi < sys.molecules.size(); mi++)
-            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                for (auto di = 0; di < d; di++)
-                    sys.molecules[mi].atoms[ai].p[di]
-                    += bsp.time_step_size * sys.molecules[mi].atoms[ai].F[di] / 2;
-    }
-
-    void nhc_procedure::thermo_propagate()
-    {
-        for (auto wi = 0; wi < tfs.nsy(); wi++) {
-            double tmp_delta = tfs.w(wi) * bsp.time_step_size / tfs.nff();
-            for (auto ni = 0; ni < tfs.nff(); ni++) {
-
-                calc_thermo_force(M - 1);
-                tmvs[M - 1].theta += tmp_delta * tmvs[M - 1].Gamma / 4;
-
-                for (int j = M - 2; j >= 0; j--) {
-                    tmvs[j].theta *= exp(-1 * tmp_delta * tmvs[j + 1].theta
-                        / (8 * tmvs[j + 1].mu));
-                    calc_thermo_force(j);
-                    tmvs[j].theta += tmp_delta * tmvs[j].Gamma / 4;
-                    tmvs[j].theta *= exp(-1 * tmp_delta * tmvs[j + 1].theta
-                        / (8 * tmvs[j + 1].mu));
-                }
-                for (int j = 0; j < M; j++)
-                    tmvs[j].eta += tmp_delta * tmvs[j].theta / (2 * tmvs[j].mu);
-
-                double momen_scale = exp(-1 * tmp_delta * tmvs[0].theta / (2 * tmvs[0].mu));
-                for (auto mi = 0; mi < sys.molecules.size(); mi++)
-                    for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                        for (auto di = 0; di < d; di++)
-                            sys.molecules[mi].atoms[ai].p[di] *= momen_scale;
-
-                for (int j = 0; j < M - 1; j++) {
-                    tmvs[j].theta *= exp(-1 * tmp_delta * tmvs[j + 1].theta
-                        / (8 * tmvs[j + 1].mu));
-                    calc_thermo_force(j);
-                    tmvs[j].theta += tmp_delta * tmvs[j].Gamma / 4;
-                    tmvs[j].theta *= exp(-1 * tmp_delta * tmvs[j + 1].theta
-                        / (8 * tmvs[j + 1].mu));
-                }
-                calc_thermo_force(M - 1);
-                tmvs[M - 1].theta += tmp_delta * tmvs[M - 1].Gamma / 4;
-            }
-        }
-    }
-
-    void nhc_procedure::calc_syco_energy()
-    {
-        kine_energy = 0.0;
-        pote_energy = 0.0;
-
-        double omega = 1;
+        // initialize positions and masses
+        int vi = 0;
         for (auto mi = 0; mi < sys.molecules.size(); mi++) {
             for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
                 for (auto di = 0; di < d; di++) {
-                    kine_energy += pow(sys.molecules[mi].atoms[ai].p[di], 2)
-                        / (2 * sys.molecules[mi].atoms[ai].m);
-                    pote_energy += 0.5 * sys.molecules[mi].atoms[ai].m
-                        * pow(omega, 2) * pow(sys.molecules[mi].atoms[ai].q[di], 2);
+                    m(vi) = sys.molecules[mi].atoms[ai].m;
+                    q(vi) = sys.molecules[mi].atoms[ai].q[di];
+                    vi++;
                 }
             }
         }
-        ther_energy = pow(tmvs[0].theta, 2) / (2 * tmvs[0].mu) + d * N * k * T * tmvs[0].eta;
-        for (int j = 1; j < M; j++) {
-            ther_energy += pow(tmvs[j].theta, 2) / (2 * tmvs[j].mu) + k * T * tmvs[j].eta;
+
+        // initialize momenta
+        for (auto ri = 0; ri < p.rows(); ri++) {
+            std::normal_distribution<double> ndrm{ 0, sqrt(k * T * m(ri)) };
+            p(ri) = ndrm(s_mte);
         }
-        syst_energy = kine_energy + pote_energy;
+
+        // initialize extented masses and extented momenta
+        //if (sys.model_type == "HO") { // simple harmonic forces
+        //    model::harmonic_oscilator HO(sys.model_para[0]);
+        //    double tau = 1 / HO.ome();
+        double tau = 1;
+        mu = k * T * pow(tau, 2) * Eigen::ArrayXd::Constant(M, 1);
+        for (auto j = 0; j < M; j++) {
+            std::normal_distribution<double> ndrm{ 0, sqrt(k * T * mu(j)) };
+            theta(j) = ndrm(theta_mte);
+        }
+        //}
+
+        // initialize extented positions
+        eta.setZero();
+
+    }
+
+    // calculate physical forces
+    void nhc_procedure_global::calc_physic_force()
+    {
+        if (sys.model_type == "HO") { // simple harmonic forces
+            model::harmonic_oscilator HO(sys.model_para[0]);
+            F = -1 * m * pow(HO.ome(), 2) * q;
+        }
+        else if (sys.model_type == "LJ") { // Lennard_Jones forces
+            F.setZero();
+            model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
+            for (auto ni = 0; ni < N; ni++) {
+                for (auto nj = 0; nj < N; nj++) {
+                    if (ni == nj) continue;
+                    F.block(d * ni, 0, d, 1) += LJ.F(q.block(d * ni, 0, d, 1), q.block(d * nj, 0, d, 1));
+                }
+            }
+        }
+    }
+
+    void nhc_procedure_global::calc_thermo_force(const int& j)
+    {
+        if (j == 0)
+            Gamma(0) = (p.pow(2) / m).sum() - d * N * k * T;
+        else
+            Gamma(j) = pow(theta(j - 1), 2) / mu(j - 1) - k * T;
+    }
+
+    void nhc_procedure_global::physic_propagate()
+    {
+        calc_physic_force();
+        p += Dt * F / 2;
+        q += Dt * p / m;
+        calc_physic_force();
+        p += Dt * F / 2;
+    }
+
+    void nhc_procedure_global::thermo_propagate()
+    {
+        for (auto wi = 0; wi < tfs.nsy(); wi++) {
+            double tmp_delta = tfs.w(wi) * Dt / tfs.nff();
+            for (auto ni = 0; ni < tfs.nff(); ni++) {
+
+                calc_thermo_force(M - 1);
+                theta(M - 1) += tmp_delta * Gamma(M - 1) / 4;
+
+                for (int j = M - 2; j >= 0; j--) {
+                    theta(j) *= exp(-1 * tmp_delta * theta(j + 1) / (8 * mu(j + 1)));
+                    calc_thermo_force(j);
+                    theta(j) += tmp_delta * Gamma(j) / 4;
+                    theta(j) *= exp(-1 * tmp_delta * theta(j + 1) / (8 * mu(j + 1)));
+                }
+                eta += tmp_delta * theta / (2 * mu);
+
+                double momen_scale = exp(-1 * tmp_delta * theta(0) / (2 * mu(0)));
+                p *= momen_scale;
+
+                for (int j = 0; j < M - 1; j++) {
+                    theta(j) *= exp(-1 * tmp_delta * theta(j + 1) / (8 * mu(j + 1)));
+                    calc_thermo_force(j);
+                    theta(j) += tmp_delta * Gamma(j) / 4;
+                    theta(j) *= exp(-1 * tmp_delta * theta(j + 1) / (8 * mu(j + 1)));
+                }
+                calc_thermo_force(M - 1);
+                theta(M - 1) += tmp_delta * Gamma(M - 1) / 4;
+            }
+        }
+    }
+
+    void nhc_procedure_global::calc_cons_quant()
+    {
+        kine_energy = (p.pow(2) / (2 * m)).sum();
+
+        pote_energy = 0;
+        if (sys.model_type == "HO") { // harmonic oscillator
+            model::harmonic_oscilator HO(sys.model_para[0]);
+            pote_energy = 0.5 * pow(HO.ome(), 2) * (m * q.pow(2)).sum();
+        }
+        else if (sys.model_type == "LJ") { // Lennard_Jones
+            model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
+            for (auto ni = 0; ni < N - 1; ni++) {
+                for (auto nj = ni + 1; nj < N; nj++) {
+                    if (ni == nj) continue;
+                    pote_energy += LJ.V(q.block(d * ni, 0, d, 1), q.block(d * nj, 0, d, 1));
+                }
+            }
+        }
+
+        ther_energy = pow(theta(0), 2) / (2 * mu(0)) + d * N * k * T * eta(0);
+        for (int j = 1; j < M; j++)
+            ther_energy += pow(theta(j), 2) / (2 * mu(j)) + k * T * eta(j);
+
         cons_energy = kine_energy + pote_energy + ther_energy;
     }
 
-    void nhc_procedure::print_nhc_procedure_title(std::ofstream& out) {
-        std::cout << "\n\nNHC Procedure:\n   Time";
-        out << "\n\nNHC Procedure:\nTime";
-
-        for (int mi = 0; mi < sys.molecules.size(); mi++) {
-            for (int ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                for (int di = 0; di < d; di++) {
-                    std::cout << "    m[" << mi + 1 << "].a[" << ai + 1 << "].q[" << di + 1 << "]";
-                    out << "\tm[" << mi + 1 << "].a[" << ai + 1 << "].q[" << di + 1 << "]";
-                }
-                for (int di = 0; di < d; di++) {
-                    std::cout << "\tm[" << mi + 1 << "].a[" << ai + 1 << "].p[" << di + 1 << "]";
-                    out << "\tm[" << mi + 1 << "].a[" << ai + 1 << "].p[" << di + 1 << "]";
-                }
-            }
-        }
-        std::cout << "\tcons_energy";
-        out << "\tcons_energy";
+    void nhc_procedure_global::print_nhc_procedure_title(std::ofstream& out) {
+        std::cout << "\nNHC Procedure (Global):\n   Time" << "            " << "position"
+            << "            " << "momentum" << "          " << "cons_energy";
+        out << "\nNHC Procedure (Global):\n   Time" << "            " << "position"
+            << "            " << "momentum" << "          " << "cons_energy";
     }
 
-    void nhc_procedure::print_nhc_procedure_data(std::ofstream& out, double& t) {
+    void nhc_procedure_global::print_nhc_procedure_data(std::ofstream& out, double& t) {
         std::cout << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
-        out << "\n" << std::fixed << std::setprecision(5) << t;
+        out << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
 
         std::cout << std::setprecision(8);
         out << std::setprecision(8);
-        for (int mi = 0; mi < sys.molecules.size(); mi++) {
-            for (int ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                for (int di = 0; di < d; di++) {
-                    std::cout << std::setw(15) << sys.molecules[mi].atoms[ai].q[di];
-                    out << "\t" << sys.molecules[mi].atoms[ai].q[di];
-                }
-                for (int di = 0; di < d; di++) {
-                    std::cout << std::setw(15) << sys.molecules[mi].atoms[ai].p[di];
-                    out << "\t" << sys.molecules[mi].atoms[ai].p[di];
-                }
-            }
-        }
-        std::cout << "\t" << cons_energy;
-        out << "\t" << cons_energy;
+        std::cout << std::scientific << std::setw(20) << q(0, 0) << std::setw(20)
+            << p(0, 0) << std::setw(20) << cons_energy;
+        out << std::scientific << std::setw(20) << q(0, 0) << std::setw(20)
+            << p(0, 0) << std::setw(20) << cons_energy;
     }
 
-    void nhc_procedure::implement() {
-        for (double t = 0; t <= bsp.run_time; t += bsp.time_step_size) {
+    void nhc_procedure_global::implement() {
+        for (double t = 0; t <= bsp.run_time; t += Dt) {
             thermo_propagate();
             physic_propagate();
             thermo_propagate();
-            t += bsp.time_step_size;
+            t += Dt;
+        }
+    }
+
+    void nhc_procedure_global::implement(std::ofstream& out)
+    {
+        initialize();
+
+        double t = 0;
+        int ctr = 0;
+
+        print_nhc_procedure_title(out);
+        calc_cons_quant();
+        print_nhc_procedure_data(out, t);
+
+        const auto tstart = std::chrono::high_resolution_clock::now();
+        do {
+            // NHC numerical evolution
+            thermo_propagate();
+            physic_propagate();
+            thermo_propagate();
+
+            if (ctr == bsp.data_coll_peri) {
+                calc_cons_quant();
+                print_nhc_procedure_data(out, t);
+                ctr = 0;
+            }
+            ctr++;
+            t += Dt;
+        } while (t <= bsp.run_time);
+        const auto tstop = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> time_elapsed = tstop - tstart;
+
+        std::cout << "\nElapsed time of NHC procedure (s): " << time_elapsed.count() << std::endl;
+    }
+
+    //--------------------------------------------------------//
+
+    /*** ================================================== ***/
+    /*** NHC Procedure (Local) Class Member Functions       ***/
+    /*** ================================================== ***/
+
+    // initialization
+    void nhc_procedure_local::initialize()
+    {
+        // resize arrays
+        m.resize(d * N);
+        q.resize(d * N);
+        p.resize(d * N);
+        F.resize(d * N);
+
+        mu.resize(d * N, M);
+        eta.resize(d * N, M);
+        theta.resize(d * N, M);
+        Gamma.resize(d * N, M);
+
+        // initialize positions and masses
+        int vi = 0;
+        for (auto mi = 0; mi < sys.molecules.size(); mi++) {
+            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
+                for (auto di = 0; di < d; di++) {
+                    m(vi) = sys.molecules[mi].atoms[ai].m;
+                    q(vi) = sys.molecules[mi].atoms[ai].q[di];
+                    vi++;
+                }
+            }
+        }
+
+        // initialize momenta
+        for (auto ri = 0; ri < p.rows(); ri++) {
+            std::normal_distribution<double> ndrm{ 0, sqrt(k * T * m(ri)) };
+            p(ri) = ndrm(s_mte);
+        }
+
+        // initialize extented masses and extented momenta
+        //if (sys.model_type == "HO") { // simple harmonic forces
+        //    model::harmonic_oscilator HO(sys.model_para[0]);
+        //   double tau = 1 / HO.ome();
+        double tau = 1;
+        mu = k * T * pow(tau, 2) * Eigen::ArrayXXd::Constant(d * N, M, 1);
+        for (auto ri = 0; ri < theta.rows(); ri++) {
+            for (auto ci = 0; ci < theta.cols(); ci++) {
+                std::normal_distribution<double> ndrm{ 0, sqrt(k * T * mu(ri, ci)) };
+                theta(ri, ci) = ndrm(theta_mte);
+            }
+        }
+        //}
+        
+        // initialize extented positions
+        eta.setZero();
+
+    }
+
+    // calculate physical forces
+    void nhc_procedure_local::calc_physic_force()
+    {
+        if (sys.model_type == "HO") { // simple harmonic forces
+            model::harmonic_oscilator HO(sys.model_para[0]);
+            F = -1 * m * pow(HO.ome(), 2) * q;
+        }
+        else if (sys.model_type == "LJ") { // Lennard_Jones forces
+            F.setZero();
+            model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
+            for (auto ni = 0; ni < N; ni++) {
+                for (auto nj = 0; nj < N; nj++) {
+                    if (ni == nj) continue;
+                    F.block(d * ni, 0, d, 1) += LJ.F(q.block(d * ni, 0, d, 1), q.block(d * nj, 0, d, 1));
+                }
+            }
+        }
+    }
+
+    void nhc_procedure_local::calc_thermo_force(const int& j)
+    {
+        if (j == 0)
+            Gamma.col(0) = p.pow(2) / m - k * T;
+        else
+            Gamma.col(j) = theta.col(j - 1).pow(2) / mu.col(j - 1) - k * T;
+    }
+
+    void nhc_procedure_local::physic_propagate()
+    {
+        calc_physic_force();
+        p += Dt * F / 2;
+        q += Dt * p / m;
+        calc_physic_force();
+        p += Dt * F / 2;
+    }
+
+    void nhc_procedure_local::thermo_propagate()
+    {
+        for (auto wi = 0; wi < tfs.nsy(); wi++) {
+            double tmp_delta = tfs.w(wi) * Dt / tfs.nff();
+            for (auto ni = 0; ni < tfs.nff(); ni++) {
+
+                calc_thermo_force(M - 1);
+                theta.col(M - 1) += tmp_delta * Gamma.col(M - 1) / 4;
+
+                for (int j = M - 2; j >= 0; j--) {
+                    theta.col(j) *= (-1 * tmp_delta * theta.col(j + 1) / (8 * mu.col(j + 1))).exp();
+                    calc_thermo_force(j);
+                    theta.col(j) += tmp_delta * Gamma.col(j) / 4;
+                    theta.col(j) *= (-1 * tmp_delta * theta.col(j + 1) / (8 * mu.col(j + 1))).exp();
+                }
+                eta += tmp_delta * theta / (2 * mu);
+
+                Eigen::ArrayXd momen_scale = (-1 * tmp_delta * theta.col(0) / (2 * mu.col(0))).exp();
+                p *= momen_scale;
+
+                for (int j = 0; j < M - 1; j++) {
+                    theta.col(j) *= (-1 * tmp_delta * theta.col(j + 1) / (8 * mu.col(j + 1))).exp();
+                    calc_thermo_force(j);
+                    theta.col(j) += tmp_delta * Gamma.col(j) / 4;
+                    theta.col(j) *= (-1 * tmp_delta * theta.col(j + 1) / (8 * mu.col(j + 1))).exp();
+                }
+                calc_thermo_force(M - 1);
+                theta.col(M - 1) += tmp_delta * Gamma.col(M - 1) / 4;
+            }
+        }
+    }
+
+    void nhc_procedure_local::calc_cons_quant()
+    {
+        kine_energy = (p.pow(2) / (2 * m)).sum();
+
+        pote_energy = 0;
+        if (sys.model_type == "HO") { // harmonic oscillator
+            model::harmonic_oscilator HO(sys.model_para[0]);
+            pote_energy = 0.5 * pow(HO.ome(), 2) * (m * q.pow(2)).sum();
+        }
+        else if (sys.model_type == "LJ") { // Lennard_Jones
+            model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
+            for (auto ni = 0; ni < N - 1; ni++) {
+                for (auto nj = ni + 1; nj < N; nj++) {
+                    if (ni == nj) continue;
+                    pote_energy += LJ.V(q.block(d * ni, 0, d, 1), q.block(d * nj, 0, d, 1));
+                }
+            }
+        }
+
+        ther_energy = (theta.pow(2) / (2 * mu) + k * T * eta).sum();
+
+        cons_energy = kine_energy + pote_energy + ther_energy;
+    }
+
+    void nhc_procedure_local::print_nhc_procedure_title(std::ofstream& out) {
+        std::cout << "\nNHC Procedure (Local):\n   Time" << "             " << "position"
+            << "            " << "momentum" << "          " << "cons_energy";
+        out << "\nNHC Procedure (Local):\n   Time" << "             " << "position"
+            << "            " << "momentum" << "          " << "cons_energy";
+    }
+
+    void nhc_procedure_local::print_nhc_procedure_data(std::ofstream& out, double& t) {
+        std::cout << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
+        out << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
+
+        std::cout << std::setprecision(8);
+        out << std::setprecision(8);
+        std::cout << std::scientific << std::setw(20) << q(0, 0) << std::setw(20)
+            << p(0, 0) << std::setw(20) << cons_energy;
+        out << std::scientific << std::setw(20) << q(0, 0) << std::setw(20)
+            << p(0, 0) << std::setw(20) << cons_energy;
+    }
+
+    void nhc_procedure_local::implement() {
+        for (double t = 0; t <= bsp.run_time; t += Dt) {
+            thermo_propagate();
+            physic_propagate();
+            thermo_propagate();
+            t += Dt;
+        }
+    }
+
+    void nhc_procedure_local::implement(std::ofstream& out)
+    {
+        initialize();
+
+        double t = 0;
+        int ctr = 0;
+
+        print_nhc_procedure_title(out);
+        calc_cons_quant();
+        print_nhc_procedure_data(out, t);
+
+        const auto tstart = std::chrono::high_resolution_clock::now();
+        do {
+            // NHC numerical evolution
+            thermo_propagate();
+            physic_propagate();
+            thermo_propagate();
+
+            if (ctr == bsp.data_coll_peri) {
+                calc_cons_quant();
+                print_nhc_procedure_data(out, t);
+                ctr = 0;
+            }
+            ctr++;
+            t += Dt;
+        } while (t <= bsp.run_time);
+        const auto tstop = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> time_elapsed = tstop - tstart;
+
+        std::cout << "\nElapsed time of NHC procedure (s): " << time_elapsed.count() << std::endl;
+    }
+
+    //--------------------------------------------------------//
+
+    /*** ================================================== ***/
+    /*** NHC Procedure for PIMD Class Member Functions      ***/
+    /*** ================================================== ***/
+
+    // initialization
+    void nhc_procedure_for_pimd::initialize()
+    {
+        // resize arrays
+        m.resize(d * N, nbead);
+        q.resize(d * N, nbead);
+        m_tilde.resize(d * N, nbead);
+        r.resize(d * N, nbead);
+        s.resize(d * N, nbead);
+        F.resize(d * N, nbead);
+
+        mu.resize(d * N * M, nbead);
+        eta.resize(d * N * M, nbead);
+        theta.resize(d * N * M, nbead);
+        Gamma.resize(d * N * M, nbead);
+
+        kine_energy.resize(d * N, nbead);
+        pote_energy.resize(d * N, nbead);
+        ther_energy.resize(d * N, nbead);
+        cons_energy.resize(d * N, nbead);
+
+        // initialize cartisian positions and masses
+        int vi = 0;
+        for (auto mi = 0; mi < sys.molecules.size(); mi++) {
+            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
+                for (auto di = 0; di < d; di++) {
+                    m(vi, 0) = sys.molecules[mi].atoms[ai].m;
+                    q(vi, 0) = sys.molecules[mi].atoms[ai].q[di];
+                    vi++;
+                }
+            }
+        }
+        for (auto ci = 1; ci < q.cols(); ci++) {
+            q.col(ci) = q.col(0);
+            m.col(ci) = m.col(0);
+        }
+
+        // initialize staging transformed masses
+        m_tilde.col(0) = m.col(0);
+        for (auto ci = 1; ci < m_tilde.cols(); ci++)
+            m_tilde.col(ci) = ((ci + 1.0) / ci) * m.col(ci);
+
+        m_bar = m_tilde;
+        m_bar.col(0).setZero();
+
+        // initialize staging transformed positions
+        stag_trans();
+
+        // initialize fictition momenta
+        for (auto ri = 0; ri < s.rows(); ri++) {
+            for (auto ci = 0; ci < s.cols(); ci++){
+                std::normal_distribution<double> ndrm{ 0, sqrt(k * T * m(ri, ci)) };
+                s(ri, ci) = ndrm(s_mte);
+            }
+        }
+
+        // initialize extented masses and extented momenta
+        double tau = 1;
+        mu = k * T * pow(tau, 2) * Eigen::ArrayXXd::Constant(d * N * M, nbead, 1);
+        for (auto ri = 0; ri < theta.rows(); ri++) {
+            for (auto ci = 0; ci < theta.cols(); ci++) {
+                std::normal_distribution<double> ndrm{ 0, sqrt(k * T * mu(ri, ci)) };
+                theta(ri, ci) = ndrm(theta_mte);
+            }
+        }
+
+        // initialize extented positions
+        eta.setZero();
+
+    }
+
+    // staging transformation
+    void nhc_procedure_for_pimd::stag_trans()
+    {
+        r.col(0) = q.col(0);
+        for (int ci = 1; ci < r.cols() - 1; ci++)
+            r.col(ci) = -(1 / (ci + 1.0)) * q.col(0) + q.col(ci) - (ci / (ci + 1.0)) * q.col(ci + 1);
+        r.col(r.cols() - 1) = q.col(r.cols() - 1) - q.col(0);
+    }
+
+    // inverse staging transformation
+    void nhc_procedure_for_pimd::inve_stag_trans()
+    {
+        q.col(q.cols() - 1) = r.col(q.cols() - 1) + r.col(0);
+        for (int ci = q.cols() - 2; ci > 0; ci--)
+            q.col(ci) = (1 / (ci + 1.0)) * r.col(0) + r.col(ci) + (ci / (ci + 1.0)) * q.col(ci + 1);
+        q.col(0) = r.col(0);
+    }
+
+    // calculate physical forces
+    void nhc_procedure_for_pimd::calc_physic_force()
+    {
+        Eigen::ArrayXXd pV_pq = Eigen::ArrayXXd::Zero(d * N, nbead); // \frac{\partial V}{\partial q}
+        Eigen::ArrayXXd pV_pr = Eigen::ArrayXXd::Zero(d * N, nbead); // \frac{\partial V}{\partial r}
+
+        if (sys.model_type == "HO") { // simple harmonic forces
+            model::harmonic_oscilator HO(sys.model_para[0]);
+            pV_pq = m * pow(HO.ome(), 2) * q;
+        }
+        else if (sys.model_type == "LJ") { // Lennard_Jones forces
+            model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
+            for (auto ci = 0; ci < pV_pq.cols(); ci++) {
+                for (auto ni = 0; ni < N; ni++) {
+                    for (auto nj = 0; nj < N; nj++) {
+                        if (ni == nj) continue;
+                        pV_pq.block(d * ni, ci, d, 1) -= LJ.F(q.block(d * ni, ci, d, 1), q.block(d * nj, ci, d, 1));
+                    }
+                }
+            }
+        }
+
+        for (auto cj = 0; cj < pV_pr.cols(); cj++)
+            pV_pr.col(0) += pV_pq.col(cj);
+        for (auto ci = 1; ci < pV_pr.cols(); ci++)
+            pV_pr.col(ci) = pV_pq.col(ci) + ((ci - 1.0) / ci) * pV_pr.col(ci - 1);
+        F = -1 * m_bar * pow(fic_omega, 2) * r - pV_pr / nbead;
+
+    }
+
+    void nhc_procedure_for_pimd::calc_thermo_force(const int& j)
+    {
+        if (j == 0)
+            Gamma.block(0, 0, dof, nbead) = s.pow(2) / m_tilde - k * T;
+        else
+            Gamma.block(j * dof, 0, dof, nbead) = theta.block((j - 1) * dof, 0, dof, nbead).pow(2)
+            / mu.block((j - 1) * dof, 0, dof, nbead) - k * T;
+    }
+
+    void nhc_procedure_for_pimd::physic_propagate()
+    {
+        calc_physic_force();
+        s += Dt * F / 2;
+        r += Dt * s / m_tilde;
+        inve_stag_trans();
+        calc_physic_force();
+        s += Dt * F / 2;
+    }
+
+    void nhc_procedure_for_pimd::thermo_propagate()
+    {
+        for (auto wi = 0; wi < tfs.nsy(); wi++) {
+            double tmp_delta = tfs.w(wi) * Dt / tfs.nff();
+            for (auto ni = 0; ni < tfs.nff(); ni++) {
+
+                calc_thermo_force(M - 1);
+                theta.block((M - 1) * dof, 0, dof, nbead) += tmp_delta * Gamma.block((M - 1) * dof, 0, dof, nbead) / 4;
+
+                for (int j = M - 2; j >= 0; j--) {
+                    theta.block(j * dof, 0, dof, nbead) *= (-1 * tmp_delta * theta.block((j + 1) * dof, 0, dof, nbead)
+                        / (8 * mu.block((j + 1) * dof, 0, dof, nbead))).exp();
+                    calc_thermo_force(j);
+                    theta.block(j * dof, 0, dof, nbead) += tmp_delta * Gamma.block(j * dof, 0, dof, nbead) / 4;
+                    theta.block(j * dof, 0, dof, nbead) *= (-1 * tmp_delta * theta.block((j + 1) * dof, 0, dof, nbead)
+                        / (8 * mu.block((j + 1) * dof, 0, dof, nbead))).exp();
+                }
+                eta += tmp_delta * theta / (2 * mu);
+
+                Eigen::ArrayXXd momen_scale = (-1 * tmp_delta * theta.block(0, 0, dof, nbead)
+                    / (2 * mu.block(0, 0, dof, nbead))).exp();
+                s *= momen_scale;
+
+                for (int j = 0; j < M - 1; j++) {
+                    theta.block(j * dof, 0, dof, nbead) *= (-1 * tmp_delta * theta.block((j + 1) * dof, 0, dof, nbead)
+                        / (8 * mu.block((j + 1) * dof, 0, dof, nbead))).exp();
+                    calc_thermo_force(j);
+                    theta.block(j * dof, 0, dof, nbead) += tmp_delta * Gamma.block(j * dof, 0, dof, nbead) / 4;
+                    theta.block(j * dof, 0, dof, nbead) *= (-1 * tmp_delta * theta.block((j + 1) * dof, 0, dof, nbead)
+                        / (8 * mu.block((j + 1) * dof, 0, dof, nbead))).exp();
+                }
+                calc_thermo_force(M - 1);
+                theta.block((M - 1) * dof, 0, dof, nbead) += tmp_delta * Gamma.block((M - 1) * dof, 0, dof, nbead) / 4;
+            }
+        }
+    }
+
+    void nhc_procedure_for_pimd::calc_cons_quant()
+    {
+        kine_energy = s.pow(2) / (2 * m_tilde);
+
+        
+        pote_energy.setZero();
+        if (sys.model_type == "HO") { // harmonic oscillator
+            model::harmonic_oscilator HO(sys.model_para[0]);
+            pote_energy = 0.5 * m * pow(HO.ome(), 2) * q.pow(2);
+        }
+        else if (sys.model_type == "LJ") { // Lennard_Jones
+            model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
+            for (auto ci = 0; ci < pote_energy.cols(); ci++) {
+                for (auto ni = 0; ni < N; ni++) {
+                    for (auto nj = 0; nj < N; nj++) {
+                        if (ni == nj) continue;
+                        pote_energy.block(d * ni, ci, d, 1) += LJ.V(q.block(d * ni, ci, d, 1), q.block(d * nj, ci, d, 1));
+                    }
+                }
+            }
+            pote_energy /= 2 * d;
+        }
+        pote_energy = 0.5 * m_bar * pow(fic_omega, 2) * r.pow(2) + pote_energy / nbead;
+
+        ther_energy.setZero();
+        for (int j = 0; j < M; j++)
+            ther_energy += theta.block(j * dof, 0, dof, nbead).pow(2) / (2 * mu.block(j * dof, 0, dof, nbead))
+            + k * T * eta.block(j * dof, 0, dof, nbead);
+
+        cons_energy = kine_energy + pote_energy + ther_energy;
+    }
+
+    void nhc_procedure_for_pimd::calc_prim_estor()
+    {
+        prim_kine_estor = 0;
+        for (int bi = 0; bi < nbead - 1; bi++)
+            prim_kine_estor += (m.col(bi) * (q.col(bi + 1) - q.col(bi)).pow(2)).sum();
+        prim_kine_estor += (m.col(nbead - 1) * (q.col(0) - q.col(nbead - 1)).pow(2)).sum();
+        prim_kine_estor *= -1 * nbead / (2 * pow(h_bar * beta, 2));
+        prim_kine_estor += dof * nbead / (2 * beta);
+
+        if (sys.model_type == "HO") { // simple harmonic forces
+            model::harmonic_oscilator HO(sys.model_para[0]);
+            pote_energy = 0.5 * m * pow(HO.ome(), 2) * q.pow(2);
+        }
+        else if (sys.model_type == "LJ") { // Lennard_Jones forces
+            model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
+            for (auto ci = 0; ci < pote_energy.cols(); ci++) {
+                for (auto ni = 0; ni < N; ni++) {
+                    for (auto nj = 0; nj < N; nj++) {
+                        if (ni == nj) continue;
+                        pote_energy.block(d * ni, ci, d, 1) += LJ.V(q.block(d * ni, ci, d, 1), q.block(d * nj, ci, d, 1));
+                    }
+                }
+            }
+            pote_energy /= 2;
+        }
+        prim_pote_estor = pote_energy.sum() / nbead;
+
+        //prim_pres_estor = N*nbead/(beta * V)
+    }
+
+    void nhc_procedure_for_pimd::print_nhc_procedure_title(std::ofstream& out) {
+        std::cout << "\nNHC Procedure for PIMD:\n   Time" << "            " << "position" << "            " << "momentum"
+            << "          " << "cons_energy" << "        " << "prim_kine_estor" << "     " << "prim_pote_estor";
+        out << "\nNHC Procedure for PIMD:\n   Time" << "            " << "position" << "            " << "momentum"
+            << "          " << "cons_energy" << "        " << "prim_kine_estor" << "     " << "prim_pote_estor";
+    }
+
+    void nhc_procedure_for_pimd::print_nhc_procedure_data(std::ofstream& out, double& t) {
+        std::cout << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
+        out << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
+
+        std::cout << std::setprecision(8);
+        out << std::setprecision(8);
+        std::cout << std::scientific << std::setw(20) << r(0, 0) << std::setw(20) << s(0, 0) << std::setw(20)
+            << cons_energy.sum() << std::setw(20) << prim_kine_estor << std::setw(20) << prim_pote_estor;
+        out << std::scientific << std::setw(20) << r(0, 0) << std::setw(20) << s(0, 0) << std::setw(20)
+            << cons_energy.sum() << std::setw(20) << prim_kine_estor << std::setw(20) << prim_pote_estor;
+    }
+
+    void nhc_procedure_for_pimd::implement() {
+        for (double t = 0; t <= bsp.run_time; t += Dt) {
+            thermo_propagate();
+            physic_propagate();
+            thermo_propagate();
+            t += Dt;
         }
     }
     
-    void nhc_procedure::implement(std::ofstream& out) {
+    void nhc_procedure_for_pimd::implement(std::ofstream& out)
+    {
+        initialize();
+
         double t = 0;
         int ctr = 0;
         
         print_nhc_procedure_title(out);
-        calc_syco_energy();
+        calc_cons_quant();
+        calc_prim_estor();
         print_nhc_procedure_data(out, t);
 
         const auto tstart = std::chrono::high_resolution_clock::now();
@@ -227,109 +725,18 @@ namespace nhc {
             thermo_propagate();
             
             if (ctr == bsp.data_coll_peri) {
-                calc_syco_energy();
+                calc_cons_quant();
+                calc_prim_estor();
                 print_nhc_procedure_data(out, t);
                 ctr = 0;
             }
             ctr++;
-            t += bsp.time_step_size;
+            t += Dt;
         } while (t <= bsp.run_time);
         const auto tstop = std::chrono::high_resolution_clock::now();
         const std::chrono::duration<double> time_elapsed = tstop - tstart;
 
-        std::cout << "\nElapsed time of NHC procedure (s): " << time_elapsed.count() << std::endl;
-    }
-
-
-    /*** ================================================== ***/
-    /*** NHC Procedure for PIMD Class Member Functions      ***/
-    /*** ================================================== ***/
-
-    void nhc_procedure_for_pimd::calc_physic_force()
-    {
-        double omega = 1;
-
-        for (auto mi = 0; mi < sys.molecules.size(); mi++) {
-            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                for (auto di = 0; di < d; di++) {
-                    st_syss[0].molecules[mi].atoms[ai].F[di] = 0;
-                    for (auto bj = 0; bj < nbead; bj++) {
-                        st_syss[0].molecules[mi].atoms[ai].F[di] -= pr_syss[bj].molecules[mi].atoms[ai].m
-                            * pow(omega, 2) * pr_syss[bj].molecules[mi].atoms[ai].q[di];
-                    }
-                    st_syss[0].molecules[mi].atoms[ai].F[di] /= nbead;
-                }
-            }
-        }
-
-        for (auto bi = 1; bi < nbead; bi++) {
-            for (auto mi = 0; mi < sys.molecules.size(); mi++) {
-                for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                    for (auto di = 0; di < d; di++) {
-                        st_syss[bi].molecules[mi].atoms[ai].F[di]
-                            = -st_syss[bi].molecules[mi].atoms[ai].m
-                            * pow(fic_omega, 2) * st_syss[bi].molecules[mi].atoms[ai].q[di]
-                            - (pr_syss[bi].molecules[mi].atoms[ai].m * pow(omega, 2)
-                                * pr_syss[bi].molecules[mi].atoms[ai].q[di] + ((bi - 1) / bi)
-                                * pr_syss[bi - 1].molecules[mi].atoms[ai].m * pow(omega, 2)
-                                * pr_syss[bi - 1].molecules[mi].atoms[ai].q[di]) / nbead;
-                    }
-                }
-            }
-        }
-    }
-
-    void nhc_procedure_for_pimd::calc_syco_energy() {
-        double omega = 1;
-
-        kine_energy = 0.0;
-        for (auto mi = 0; mi < sys.molecules.size(); mi++)
-            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++)
-                for (auto di = 0; di < d; di++)
-                    kine_energy += pow(st_syss[bi].molecules[mi].atoms[ai].p[di], 2)
-                        / (2 * st_syss[bi].molecules[mi].atoms[ai].m);
-
-        pote_energy = 0.0;
-        for (auto mi = 0; mi < sys.molecules.size(); mi++) {
-            for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                for (auto di = 0; di < d; di++) {
-                    for (auto bj = 0; bj < nbead; bj++) {
-                        pote_energy += 0.5 * st_syss[bj].molecules[mi].atoms[ai].m
-                            * pow(omega, 2) * pow(st_syss[bj].molecules[mi].atoms[ai].q[di], 2);
-                    }
-                    pote_energy /= nbead;
-                }
-            }
-        }
-
-        for (auto bi = 1; bi < nbead; bi++) {
-            for (auto mi = 0; mi < sys.molecules.size(); mi++) {
-                for (auto ai = 0; ai < sys.molecules[mi].atoms.size(); ai++) {
-                    for (auto di = 0; di < d; di++) {
-                        pote_energy
-                            = pote_energy + 0.5 * st_syss[bi].molecules[mi].atoms[ai].m
-                            * pow(fic_omega, 2) * pow(st_syss[bi].molecules[mi].atoms[ai].q[di], 2)
-                            + 0.5 * (pr_syss[bi].molecules[mi].atoms[ai].m * pow(omega, 2)
-                                * pow(pr_syss[bi].molecules[mi].atoms[ai].q[di], 2) + ((bi - 1) / bi)
-                                * pr_syss[bi - 1].molecules[mi].atoms[ai].m * pow(omega, 2)
-                                * pow(pr_syss[bi - 1].molecules[mi].atoms[ai].q[di], 2)) / nbead;
-                    }
-                }
-            }
-        }
-
-        ther_energy = pow(tmvs[0].theta, 2) / (2 * tmvs[0].mu) + d * N * k * T * tmvs[0].eta;
-        for (int j = 1; j < M; j++) {
-            ther_energy += pow(tmvs[j].theta, 2) / (2 * tmvs[j].mu) + k * T * tmvs[j].eta;
-        }
-        syst_energy = kine_energy + pote_energy;
-        cons_energy = kine_energy + pote_energy + ther_energy;
-    }
-
-    void nhc_procedure_for_pimd::imple_one_step() {
-        thermo_propagate();
-        physic_propagate();
-        thermo_propagate();
+        std::cout << "\nElapsed time of NHC procedure for PIMD (s): " << time_elapsed.count() << std::endl;
     }
 
 } // !nhc

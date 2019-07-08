@@ -19,6 +19,11 @@ namespace atom_data {
         "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn",
         "Nh", "Fl", "Mc", "Lv", "Ts", "Og" };
 
+    static const std::vector<double> atomic_mass_kg{ // -1 represents an uncertain data
+        9.10938356e-31, -1, -1, -1, -1, -1, -1, -1, -1, 3.35e-26
+    };
+    
+    
     static const std::vector<double> atomic_weight{ // -1 represents an uncertain data
         1.008, 4.0026, 6.94, 9.0122, 10.81, 12.011, 14.007, 15.999, 18.998, 20.18, 22.99, 24.305,
         26.982, 28.085, 30.974, 32.06, 35.45, 39.88, 39.098, 40.078, 44.956, 47.867, 50.942,
@@ -30,7 +35,7 @@ namespace atom_data {
         204.38, 207.2, 208.98, -1, -1, -1, -1, -1, -1, 232.04, 231.04, 238.03, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
-    static const std::vector<double> atomic_mass{ // -1 represents an uncertain data
+    static const std::vector<double> atomic_mass{ // unit: Da or u // -1 represents an uncertain data
         1/*1.00782503223*/, 4.00260325413, 7.0160034366, 9.012183065, 11.00930536, 12.0000000,
         14.00307400443, 15.99491461957, 18.99840316273, 19.9924401762, 22.9897692820, 23.985041697,
         26.98153853, 27.97692653465, 30.97376199842, 31.9720711744, 34.968852682, 39.9623831237,

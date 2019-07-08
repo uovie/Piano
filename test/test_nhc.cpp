@@ -1,10 +1,10 @@
+// standard C++ headers
 #include <string>
 #include <vector>
 #include <cmath>
 
-#include <cassert>
-
-#include "uov_proc.h"
+// uovie headers
+#include "process.h"
 #include "simu_para.h"
 #include "phy_const.h"
 #include "thermostat/nhc.h"
@@ -13,8 +13,8 @@ using namespace uovie;
 
 uovie::Global::process simulation;
 
-int main(int argc, char* argv[]) {
-
+int main(int argc, char* argv[])
+{
     /*** ================================================== ***/
     /*** Simulation Preparation                             ***/
     /*** ================================================== ***/
@@ -22,13 +22,6 @@ int main(int argc, char* argv[]) {
     simulation.open(argv[1]);
     simulation.read();
 
-    /*** ================================================== ***/
-    /*** Thermostat variables Generation                    ***/
-    /*** ================================================== ***/
-
-    std::vector<thermostat::nhc::thermo_vari> tmvs;
-    thermostat::nhc::thermo_vari_generator(simulation.sys, tmvs, 4, 1);
-    
     /*** ================================================== ***/
     /*** Thermostat Factorization Scheme Declaration        ***/
     /*** ================================================== ***/
@@ -39,8 +32,8 @@ int main(int argc, char* argv[]) {
     /*** NHC Simulation Execution                           ***/
     /*** ================================================== ***/
 
-    thermostat::nhc::nhc_procedure nhc_proce(simulation.bsp,
-        simulation.sys, tmvs, tfs);
+    thermostat::nhc::nhc_procedure_local nhc_proce(simulation.bsp,
+        simulation.sys, tfs, 4);
     nhc_proce.implement(simulation.out);
 
     /*** ================================================== ***/

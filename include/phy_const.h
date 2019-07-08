@@ -61,14 +61,24 @@ namespace phy_const {
     /*** Non-SI units accepted for use with the SI ***/
     /*** ========================================= ***/
 
-    constexpr auto a_u_length = 0.52917721067e-10; // ("a.u. of length: Bohr radius (bohr)", "a0", 0.52917721067e-10, "m", 2.3e-10)
+    
 
     /*** ========================================= ***/
     /*** Atomic units (a.u.)                       ***/
     /*** ========================================= ***/
 
+    constexpr auto a_u_mass = 9.10938356e-31; // ("a.u. of mass", "me", 9.10938356e−31, "kg", 1.2e−8)
     constexpr auto a_u_action = 1.054571800e-34; // ("a.u. of action: h/2pi", "h_bar", 1.054571800e-34, "J s", 1.2e-8)
+    constexpr auto a_u_length = 0.52917721067e-10; // ("a.u. of length: Bohr radius (bohr)", "a0", 0.52917721067e-10, "m", 2.3e-10)
+    constexpr auto a_u_energy = 4.359744650e-18; // ("a.u. of energy: Hartree energy (hartree)", "Eh", 4.359744650e-18, "J", 1.2e-8)
+    constexpr auto a_u_time = 2.418884326509e-17; // ("a.u. of time", "h/Eh", 2.418884326509e−17, "s", 5.9e-12)
 
+
+    /* VII
+     * The values of some energy equivalents.
+     */
+
+    constexpr auto energy_K = 1.38064852e-23; // ("energy of 1K", 1.38064852e-23, "J")
 
 } // !phy_const
 } // !uovie

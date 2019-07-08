@@ -7,11 +7,11 @@ namespace Global {
 
     class basic_simu_para {
     public:
-        double run_time;                    // run time
-        double time_step_size;              // step size
-        int data_coll_peri;                 // data collection period
+        double run_time;        // run time
+        double step_size;       // time step size
+        int data_coll_peri;     // data collection period
     };
     
-}   // Global
-}   // uovie
-#endif
+} // !Global
+} // !uovie
+#endif // !SIMU_PARA_H_

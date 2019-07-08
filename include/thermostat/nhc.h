@@ -7,41 +7,22 @@
 #include <vector>
 #include <cmath>
 
+// Eigen matrix algebra library
+#include <Eigen/Dense>
+
 // uovie headers
 #include "simu_para.h"
 #include "phy_const.h"
 #include "mol_geom.h"
 
-
-
 namespace uovie {
 namespace thermostat {
 namespace nhc {
 
-    /*** ================================================== ***/
-    /*** Thermostat Variables                               ***/
-    /*** ================================================== ***/
+    // shorthand for physical constants
+    constexpr double h_bar = uovie::phy_const::red_Planck_const;
+    constexpr double k = uovie::phy_const::Boltzmann_const;
 
-    class thermo_vari {
-    public:
-        thermo_vari() = default;
-        thermo_vari(double m, double e, double t):
-            mu(m), eta(e), theta(t) { }
-
-        double mu;                      // extented mass
-        double eta;                     // extented position
-        double theta;                   // extented momentum
-        double Gamma;                   // thermostat force
-    };
-
-    class thermo_vari_coll {
-    public:
-        std::vector<thermostat::nhc::thermo_vari> tmvc;
-    };
-
-    void thermo_vari_generator(const Global::system& sys,
-        std::vector<thermo_vari>& tmvs, int M, double tau);
-    
     /*** ================================================== ***/
     /*** Thermostat Factorization Scheme                    ***/
     /*** ================================================== ***/
@@ -50,14 +31,14 @@ namespace nhc {
     class thermo_factor_scheme {
     public:
         thermo_factor_scheme() = default;
-        thermo_factor_scheme(const int nsy, const int nff): n_sy(nsy), n_ff(nff) {
-            if (nsy == 3)
+        thermo_factor_scheme(const int _n_sy, const int _n_ff): n_sy(_n_sy), n_ff(_n_ff) {
+            if (_n_sy == 3)
                 weight = { 1.351207191959658, -1.702414383919316, 1.351207191959658 };
-            else if (nsy == 7)
+            else if (_n_sy == 7)
                 weight = { 0.784513610477560, 0.235573213359357, -1.17767998417887,
                     1.315186320683906, -1.17767998417887, 0.235573213359357, 0.784513610477560 };
             else
-                throw "unsupported Suzuki-Yoshida scheme";
+                throw "unsupported NHC factorization scheme";
         }
 
         int nsy() const { return n_sy; }
@@ -70,79 +51,187 @@ namespace nhc {
         std::vector<double> weight;     // Suzuki-Yoshida weights
     };
 
+    //--------------------------------------------------------//
+
     /*** ================================================== ***/
-    /*** NHC Procedure                                      ***/
+    /*** NHC Procedure (Global)                             ***/
     /*** ================================================== ***/
 
-    class nhc_procedure {
+    class nhc_procedure_global {
     public:
-        nhc_procedure() = default;
-        nhc_procedure(const Global::basic_simu_para& b, Global::system& s,
-            std::vector<thermo_vari>& t, const thermo_factor_scheme& f) :
-            bsp(b), sys(s), tmvs(t), tfs(f) { }
-        ~nhc_procedure() { }
-        
+        nhc_procedure_global() = default;
+        nhc_procedure_global(const Global::basic_simu_para& _bsp, const Global::system& _sys,
+            const thermo_factor_scheme& _tfs, const int _nchain) :
+            bsp(_bsp), sys(_sys), tfs(_tfs), nchain(_nchain) { }
+
         void implement();
         void implement(std::ofstream& out);
-        double sys_ene() const { return syst_energy; }
 
-    protected:
+    private:
         const Global::basic_simu_para& bsp;
-        Global::system& sys;
-        std::vector<thermo_vari>& tmvs;
+        const Global::system& sys;
         const thermo_factor_scheme& tfs;
+        const int nchain;   // extented dimension
 
+        const double& Dt = bsp.step_size;
         const int& d = sys.dimension;
         const int& N = sys.num_part;
-        const double k = uovie::phy_const::Boltzmann_const;
+        const int dof = d * N;
         const double& T = sys.temperature;
-        const int M = tmvs.size();          // extented dimension
+        const double beta = 1 / (k * T);
+        const int& M = nchain;
 
-        double kine_energy;
-        double pote_energy;
-        double ther_energy;
-        double syst_energy;
-        double cons_energy;
+        Eigen::ArrayXd m;          // mass
+        Eigen::ArrayXd q;          // position
+        Eigen::ArrayXd p;          // momentum
+        Eigen::ArrayXd F;          // force
 
-        virtual void calc_physic_force();
+        Eigen::ArrayXd mu;         // extented mass
+        Eigen::ArrayXd eta;        // extented position
+        Eigen::ArrayXd theta;      // extented momentum
+        Eigen::ArrayXd Gamma;      // thermostat force
+
+        double kine_energy = 0;
+        double pote_energy = 0;
+        double ther_energy = 0;
+        double cons_energy = 0;
+
+        void initialize();
+        void calc_physic_force();
         void calc_thermo_force(const int& j);
         void physic_propagate();
         void thermo_propagate();
-
-        virtual void calc_syco_energy();
+        void calc_cons_quant();
 
         void print_nhc_procedure_title(std::ofstream& out);
         void print_nhc_procedure_data(std::ofstream& out, double& t);
     };
 
+    //--------------------------------------------------------//
+
     /*** ================================================== ***/
-    /*** NHC Procedure for PIMD                             ***/
+    /*** NHC Procedure (Local)                              ***/
     /*** ================================================== ***/
 
-    class nhc_procedure_for_pimd : public nhc_procedure {
+    class nhc_procedure_local {
     public:
-        nhc_procedure_for_pimd() = default;
-        nhc_procedure_for_pimd(const Global::basic_simu_para& b, Global::system& s,
-            std::vector<thermo_vari>& t, const thermo_factor_scheme& f,
-            std::vector<Global::system>& prs, std::vector<Global::system>& sts, const int i):
-            nhc_procedure(b, s, t, f), pr_syss(prs), st_syss(sts), bi(i) { }
+        nhc_procedure_local() = default;
+        nhc_procedure_local(const Global::basic_simu_para& _bsp, const Global::system& _sys,
+            const thermo_factor_scheme& _tfs, const int _nchain) :
+            bsp(_bsp), sys(_sys), tfs(_tfs), nchain(_nchain) { }
 
-        void imple_one_step();
-        void calc_syco_energy() override;
+        void implement();
+        void implement(std::ofstream& out);
 
     private:
-        const double h_bar = uovie::phy_const::red_Planck_const;
-        std::vector<Global::system>& pr_syss;
-        std::vector<Global::system>& st_syss;
-        const int nbead = pr_syss.size();
-        const double fic_omega = k * T * sqrt(nbead) / h_bar;
-        const int bi;    // bead index
+        const Global::basic_simu_para& bsp;
+        const Global::system& sys;
+        const thermo_factor_scheme& tfs;
+        const int nchain;   // extented dimension
 
-        void calc_physic_force() override;
+        const double& Dt = bsp.step_size;
+        const int& d = sys.dimension;
+        const int& N = sys.num_part;
+        const int dof = d * N;
+        const double& T = sys.temperature;
+        const double beta = 1 / (k * T);
+        const int& M = nchain;
+
+        Eigen::ArrayXd m;          // mass
+        Eigen::ArrayXd q;          // position
+        Eigen::ArrayXd p;          // momentum
+        Eigen::ArrayXd F;          // force
+
+        Eigen::ArrayXXd mu;         // extented mass
+        Eigen::ArrayXXd eta;        // extented position
+        Eigen::ArrayXXd theta;      // extented momentum
+        Eigen::ArrayXXd Gamma;      // thermostat force
+
+        double kine_energy = 0;
+        double pote_energy = 0;
+        double ther_energy = 0;
+        double cons_energy = 0;
+
+        void initialize();
+        void calc_physic_force();
+        void calc_thermo_force(const int& j);
+        void physic_propagate();
+        void thermo_propagate();
+        void calc_cons_quant();
+
+        void print_nhc_procedure_title(std::ofstream& out);
+        void print_nhc_procedure_data(std::ofstream& out, double& t);
+    };
+
+    //--------------------------------------------------------//
+
+    /*** ================================================== ***/
+    /*** NHC Procedure for pimd                             ***/
+    /*** ================================================== ***/
+
+    class nhc_procedure_for_pimd {
+    public:
+        nhc_procedure_for_pimd() = default;
+        nhc_procedure_for_pimd(const Global::basic_simu_para& _bsp, const Global::system& _sys,
+            const thermo_factor_scheme& _tfs, const int _nchain, const int _nbead):
+            bsp(_bsp), sys(_sys), tfs(_tfs), nchain(_nchain), nbead(_nbead) { }
         
+        void implement();
+        void implement(std::ofstream& out);
+
+    private:
+        const Global::basic_simu_para& bsp;
+        const Global::system& sys;
+        const thermo_factor_scheme& tfs;
+        const int nchain;   // extented dimension
+        const int nbead;
+
+        const double& Dt = bsp.step_size;
+        const int& d = sys.dimension;
+        const int& N = sys.num_part;
+        const int dof = d * N;
+        const double& T = sys.temperature;
+        const double beta = 1 / (k * T);
+        const int& M = nchain;
+        const double fic_omega = sqrt(nbead) / (h_bar * beta);
+
+        Eigen::ArrayXXd m;          // real mass
+        Eigen::ArrayXXd q;          // real position
+        Eigen::ArrayXXd m_tilde;    // transformed mass tilde
+        Eigen::ArrayXXd m_bar;      // transformed mass bar
+        Eigen::ArrayXXd r;          // transformed position
+        Eigen::ArrayXXd s;          // fictitious momentum
+        Eigen::ArrayXXd F;          // fictitious force
+        
+        Eigen::ArrayXXd mu;         // extented mass
+        Eigen::ArrayXXd eta;        // extented position
+        Eigen::ArrayXXd theta;      // extented momentum
+        Eigen::ArrayXXd Gamma;      // thermostat force
+
+        Eigen::ArrayXXd kine_energy;
+        Eigen::ArrayXXd pote_energy;
+        Eigen::ArrayXXd ther_energy;
+        Eigen::ArrayXXd cons_energy;
+
+        double prim_kine_estor = 0;
+        double prim_pote_estor = 0;
+        double prim_pres_estor = 0;
+
+        void initialize();
+        void stag_trans();
+        void inve_stag_trans();
+        void calc_physic_force();
+        void calc_thermo_force(const int& j);
+        void physic_propagate();
+        void thermo_propagate();
+        void calc_cons_quant();
+        void calc_prim_estor();
+
+        void print_nhc_procedure_title(std::ofstream& out);
+        void print_nhc_procedure_data(std::ofstream& out, double& t);
     };
 
 } // !nhc
 } // !thermostat
 } // !uovie
-#endif
+#endif // !NOSE_HOOVER_CHAIN_H_

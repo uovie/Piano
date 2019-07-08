@@ -30,6 +30,8 @@ namespace Global {
         double volume;
         double temperature;
         double pressure;
+        std::string model_type;
+        std::vector<double> model_para;
         std::vector<molecule> molecules;
     };
 }   // Global

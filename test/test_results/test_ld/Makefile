@@ -3,7 +3,7 @@ INCS    := -I ../include
 LIBS    := -L ../lib
 
 TARGETS := Piano
-OBJ     := main.o process.o model.o ld.o at.o nhc.o pimd.o
+OBJ     := test_ld.o process.o model.o ld.o
 DEPS    := 
 
 .PHONY: all clean

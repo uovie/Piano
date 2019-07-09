@@ -2,12 +2,11 @@
 #include <string>
 #include <vector>
 #include <cmath>
-#include <cassert>
 
 // uovie headers
 #include "process.h"
 #include "simu_para.h"
-#include "pimd.h"
+#include "thermostat/ld.h"
 
 using namespace uovie;
 
@@ -23,11 +22,11 @@ int main(int argc, char* argv[])
     simulation.read();
 
     /*** ================================================== ***/
-    /*** PIMD Simulation Execution                          ***/
+    /*** LD Simulation Execution                            ***/
     /*** ================================================== ***/
 
-    pimd::pimd_via_nhc pimd_proce(simulation.out, simulation.bsp, simulation.sys, 8, 4);
-    pimd_proce.implement();
+    thermostat::ld::ld_procedure_side ld_proce(simulation.bsp, simulation.sys, 1);
+    ld_proce.implement(simulation.out);
 
     /*** ================================================== ***/
     /*** Simulation termination                             ***/
@@ -37,5 +36,4 @@ int main(int argc, char* argv[])
     simulation.close();
 
     return 0;
-
 }

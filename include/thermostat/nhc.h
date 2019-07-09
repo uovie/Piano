@@ -54,13 +54,13 @@ namespace nhc {
     //--------------------------------------------------------//
 
     /*** ================================================== ***/
-    /*** NHC Procedure (Global)                             ***/
+    /*** NHC Procedure (Global, Side)                       ***/
     /*** ================================================== ***/
 
-    class nhc_procedure_global {
+    class nhc_procedure_global_side {
     public:
-        nhc_procedure_global() = default;
-        nhc_procedure_global(const Global::basic_simu_para& _bsp, const Global::system& _sys,
+        nhc_procedure_global_side() = default;
+        nhc_procedure_global_side(const Global::basic_simu_para& _bsp, const Global::system& _sys,
             const thermo_factor_scheme& _tfs, const int _nchain) :
             bsp(_bsp), sys(_sys), tfs(_tfs), nchain(_nchain) { }
 
@@ -105,18 +105,19 @@ namespace nhc {
 
         void print_nhc_procedure_title(std::ofstream& out);
         void print_nhc_procedure_data(std::ofstream& out, double& t);
+        void implement_one_step();
     };
 
     //--------------------------------------------------------//
 
     /*** ================================================== ***/
-    /*** NHC Procedure (Local)                              ***/
+    /*** NHC Procedure (Local, Side)                        ***/
     /*** ================================================== ***/
 
-    class nhc_procedure_local {
+    class nhc_procedure_local_side {
     public:
-        nhc_procedure_local() = default;
-        nhc_procedure_local(const Global::basic_simu_para& _bsp, const Global::system& _sys,
+        nhc_procedure_local_side() = default;
+        nhc_procedure_local_side(const Global::basic_simu_para& _bsp, const Global::system& _sys,
             const thermo_factor_scheme& _tfs, const int _nchain) :
             bsp(_bsp), sys(_sys), tfs(_tfs), nchain(_nchain) { }
 
@@ -161,6 +162,7 @@ namespace nhc {
 
         void print_nhc_procedure_title(std::ofstream& out);
         void print_nhc_procedure_data(std::ofstream& out, double& t);
+        void implement_one_step();
     };
 
     //--------------------------------------------------------//
@@ -229,6 +231,7 @@ namespace nhc {
 
         void print_nhc_procedure_title(std::ofstream& out);
         void print_nhc_procedure_data(std::ofstream& out, double& t);
+        void implement_one_step();
     };
 
 } // !nhc

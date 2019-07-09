@@ -1,7 +1,7 @@
-// Nose-Hoover Chain
+/* Nose-Hoover Chain */
+// standard C++ headers
 #include <iostream>
 #include <iomanip>
-#include <cassert>
 #include <chrono>
 #include <random>
 
@@ -13,9 +13,6 @@ namespace uovie {
 namespace thermostat {
 namespace nhc {
 
-    std::mt19937 s_mte(36);
-    std::mt19937 theta_mte(27);
-
     //--------------------------------------------------------//
 
     /*** ================================================== ***/
@@ -23,13 +20,13 @@ namespace nhc {
     /*** ================================================== ***/
 
     // initialization
-    void nhc_procedure_global::initialize()
+    void nhc_procedure_global_side::initialize()
     {
         // resize arrays
-        m.resize(d * N);
-        q.resize(d * N);
-        p.resize(d * N);
-        F.resize(d * N);
+        m.resize(dof);
+        q.resize(dof);
+        p.resize(dof);
+        F.resize(dof);
 
         mu.resize(M);
         eta.resize(M);
@@ -49,12 +46,14 @@ namespace nhc {
         }
 
         // initialize momenta
+        std::mt19937 p_mte(36);
         for (auto ri = 0; ri < p.rows(); ri++) {
             std::normal_distribution<double> ndrm{ 0, sqrt(k * T * m(ri)) };
-            p(ri) = ndrm(s_mte);
+            p(ri) = ndrm(p_mte);
         }
 
         // initialize extented masses and extented momenta
+        std::mt19937 theta_mte(27);
         //if (sys.model_type == "HO") { // simple harmonic forces
         //    model::harmonic_oscilator HO(sys.model_para[0]);
         //    double tau = 1 / HO.ome();
@@ -72,7 +71,7 @@ namespace nhc {
     }
 
     // calculate physical forces
-    void nhc_procedure_global::calc_physic_force()
+    void nhc_procedure_global_side::calc_physic_force()
     {
         if (sys.model_type == "HO") { // simple harmonic forces
             model::harmonic_oscilator HO(sys.model_para[0]);
@@ -90,7 +89,7 @@ namespace nhc {
         }
     }
 
-    void nhc_procedure_global::calc_thermo_force(const int& j)
+    void nhc_procedure_global_side::calc_thermo_force(const int& j)
     {
         if (j == 0)
             Gamma(0) = (p.pow(2) / m).sum() - d * N * k * T;
@@ -98,7 +97,7 @@ namespace nhc {
             Gamma(j) = pow(theta(j - 1), 2) / mu(j - 1) - k * T;
     }
 
-    void nhc_procedure_global::physic_propagate()
+    void nhc_procedure_global_side::physic_propagate()
     {
         calc_physic_force();
         p += Dt * F / 2;
@@ -107,7 +106,7 @@ namespace nhc {
         p += Dt * F / 2;
     }
 
-    void nhc_procedure_global::thermo_propagate()
+    void nhc_procedure_global_side::thermo_propagate()
     {
         for (auto wi = 0; wi < tfs.nsy(); wi++) {
             double tmp_delta = tfs.w(wi) * Dt / tfs.nff();
@@ -139,7 +138,7 @@ namespace nhc {
         }
     }
 
-    void nhc_procedure_global::calc_cons_quant()
+    void nhc_procedure_global_side::calc_cons_quant()
     {
         kine_energy = (p.pow(2) / (2 * m)).sum();
 
@@ -165,14 +164,14 @@ namespace nhc {
         cons_energy = kine_energy + pote_energy + ther_energy;
     }
 
-    void nhc_procedure_global::print_nhc_procedure_title(std::ofstream& out) {
+    void nhc_procedure_global_side::print_nhc_procedure_title(std::ofstream& out) {
         std::cout << "\nNHC Procedure (Global):\n   Time" << "            " << "position"
             << "            " << "momentum" << "          " << "cons_energy";
         out << "\nNHC Procedure (Global):\n   Time" << "            " << "position"
             << "            " << "momentum" << "          " << "cons_energy";
     }
 
-    void nhc_procedure_global::print_nhc_procedure_data(std::ofstream& out, double& t) {
+    void nhc_procedure_global_side::print_nhc_procedure_data(std::ofstream& out, double& t) {
         std::cout << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
         out << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
 
@@ -184,16 +183,20 @@ namespace nhc {
             << p(0, 0) << std::setw(20) << cons_energy;
     }
 
-    void nhc_procedure_global::implement() {
-        for (double t = 0; t <= bsp.run_time; t += Dt) {
+    void nhc_procedure_global_side::implement_one_step() {
             thermo_propagate();
             physic_propagate();
             thermo_propagate();
+    }
+
+    void nhc_procedure_global_side::implement() {
+        for (double t = 0; t <= bsp.run_time; t += Dt) {
+            implement_one_step();
             t += Dt;
         }
     }
 
-    void nhc_procedure_global::implement(std::ofstream& out)
+    void nhc_procedure_global_side::implement(std::ofstream& out)
     {
         initialize();
 
@@ -207,9 +210,7 @@ namespace nhc {
         const auto tstart = std::chrono::high_resolution_clock::now();
         do {
             // NHC numerical evolution
-            thermo_propagate();
-            physic_propagate();
-            thermo_propagate();
+            implement_one_step();
 
             if (ctr == bsp.data_coll_peri) {
                 calc_cons_quant();
@@ -232,18 +233,18 @@ namespace nhc {
     /*** ================================================== ***/
 
     // initialization
-    void nhc_procedure_local::initialize()
+    void nhc_procedure_local_side::initialize()
     {
         // resize arrays
-        m.resize(d * N);
-        q.resize(d * N);
-        p.resize(d * N);
-        F.resize(d * N);
+        m.resize(dof);
+        q.resize(dof);
+        p.resize(dof);
+        F.resize(dof);
 
-        mu.resize(d * N, M);
-        eta.resize(d * N, M);
-        theta.resize(d * N, M);
-        Gamma.resize(d * N, M);
+        mu.resize(dof, M);
+        eta.resize(dof, M);
+        theta.resize(dof, M);
+        Gamma.resize(dof, M);
 
         // initialize positions and masses
         int vi = 0;
@@ -258,12 +259,14 @@ namespace nhc {
         }
 
         // initialize momenta
+        std::mt19937 p_mte(36);
         for (auto ri = 0; ri < p.rows(); ri++) {
             std::normal_distribution<double> ndrm{ 0, sqrt(k * T * m(ri)) };
-            p(ri) = ndrm(s_mte);
+            p(ri) = ndrm(p_mte);
         }
 
         // initialize extented masses and extented momenta
+        std::mt19937 theta_mte(27);
         //if (sys.model_type == "HO") { // simple harmonic forces
         //    model::harmonic_oscilator HO(sys.model_para[0]);
         //   double tau = 1 / HO.ome();
@@ -283,7 +286,7 @@ namespace nhc {
     }
 
     // calculate physical forces
-    void nhc_procedure_local::calc_physic_force()
+    void nhc_procedure_local_side::calc_physic_force()
     {
         if (sys.model_type == "HO") { // simple harmonic forces
             model::harmonic_oscilator HO(sys.model_para[0]);
@@ -301,7 +304,7 @@ namespace nhc {
         }
     }
 
-    void nhc_procedure_local::calc_thermo_force(const int& j)
+    void nhc_procedure_local_side::calc_thermo_force(const int& j)
     {
         if (j == 0)
             Gamma.col(0) = p.pow(2) / m - k * T;
@@ -309,7 +312,7 @@ namespace nhc {
             Gamma.col(j) = theta.col(j - 1).pow(2) / mu.col(j - 1) - k * T;
     }
 
-    void nhc_procedure_local::physic_propagate()
+    void nhc_procedure_local_side::physic_propagate()
     {
         calc_physic_force();
         p += Dt * F / 2;
@@ -318,7 +321,7 @@ namespace nhc {
         p += Dt * F / 2;
     }
 
-    void nhc_procedure_local::thermo_propagate()
+    void nhc_procedure_local_side::thermo_propagate()
     {
         for (auto wi = 0; wi < tfs.nsy(); wi++) {
             double tmp_delta = tfs.w(wi) * Dt / tfs.nff();
@@ -350,7 +353,7 @@ namespace nhc {
         }
     }
 
-    void nhc_procedure_local::calc_cons_quant()
+    void nhc_procedure_local_side::calc_cons_quant()
     {
         kine_energy = (p.pow(2) / (2 * m)).sum();
 
@@ -374,14 +377,14 @@ namespace nhc {
         cons_energy = kine_energy + pote_energy + ther_energy;
     }
 
-    void nhc_procedure_local::print_nhc_procedure_title(std::ofstream& out) {
+    void nhc_procedure_local_side::print_nhc_procedure_title(std::ofstream& out) {
         std::cout << "\nNHC Procedure (Local):\n   Time" << "             " << "position"
             << "            " << "momentum" << "          " << "cons_energy";
         out << "\nNHC Procedure (Local):\n   Time" << "             " << "position"
             << "            " << "momentum" << "          " << "cons_energy";
     }
 
-    void nhc_procedure_local::print_nhc_procedure_data(std::ofstream& out, double& t) {
+    void nhc_procedure_local_side::print_nhc_procedure_data(std::ofstream& out, double& t) {
         std::cout << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
         out << "\n" << std::fixed << std::setprecision(5) << std::setw(10) << t;
 
@@ -393,16 +396,20 @@ namespace nhc {
             << p(0, 0) << std::setw(20) << cons_energy;
     }
 
-    void nhc_procedure_local::implement() {
+    void nhc_procedure_local_side::implement_one_step() {
+        thermo_propagate();
+        physic_propagate();
+        thermo_propagate();
+    }
+
+    void nhc_procedure_local_side::implement() {
         for (double t = 0; t <= bsp.run_time; t += Dt) {
-            thermo_propagate();
-            physic_propagate();
-            thermo_propagate();
+            implement_one_step();
             t += Dt;
         }
     }
 
-    void nhc_procedure_local::implement(std::ofstream& out)
+    void nhc_procedure_local_side::implement(std::ofstream& out)
     {
         initialize();
 
@@ -416,9 +423,7 @@ namespace nhc {
         const auto tstart = std::chrono::high_resolution_clock::now();
         do {
             // NHC numerical evolution
-            thermo_propagate();
-            physic_propagate();
-            thermo_propagate();
+            implement_one_step();
 
             if (ctr == bsp.data_coll_peri) {
                 calc_cons_quant();
@@ -444,22 +449,22 @@ namespace nhc {
     void nhc_procedure_for_pimd::initialize()
     {
         // resize arrays
-        m.resize(d * N, nbead);
-        q.resize(d * N, nbead);
-        m_tilde.resize(d * N, nbead);
-        r.resize(d * N, nbead);
-        s.resize(d * N, nbead);
-        F.resize(d * N, nbead);
+        m.resize(dof, nbead);
+        q.resize(dof, nbead);
+        m_tilde.resize(dof, nbead);
+        r.resize(dof, nbead);
+        s.resize(dof, nbead);
+        F.resize(dof, nbead);
 
-        mu.resize(d * N * M, nbead);
-        eta.resize(d * N * M, nbead);
-        theta.resize(d * N * M, nbead);
-        Gamma.resize(d * N * M, nbead);
+        mu.resize(dof * M, nbead);
+        eta.resize(dof * M, nbead);
+        theta.resize(dof * M, nbead);
+        Gamma.resize(dof * M, nbead);
 
-        kine_energy.resize(d * N, nbead);
-        pote_energy.resize(d * N, nbead);
-        ther_energy.resize(d * N, nbead);
-        cons_energy.resize(d * N, nbead);
+        kine_energy.resize(dof, nbead);
+        pote_energy.resize(dof, nbead);
+        ther_energy.resize(dof, nbead);
+        cons_energy.resize(dof, nbead);
 
         // initialize cartisian positions and masses
         int vi = 0;
@@ -489,6 +494,7 @@ namespace nhc {
         stag_trans();
 
         // initialize fictition momenta
+        std::mt19937 s_mte(36);
         for (auto ri = 0; ri < s.rows(); ri++) {
             for (auto ci = 0; ci < s.cols(); ci++){
                 std::normal_distribution<double> ndrm{ 0, sqrt(k * T * m(ri, ci)) };
@@ -497,6 +503,7 @@ namespace nhc {
         }
 
         // initialize extented masses and extented momenta
+        std::mt19937 theta_mte(27);
         double tau = 1;
         mu = k * T * pow(tau, 2) * Eigen::ArrayXXd::Constant(d * N * M, nbead, 1);
         for (auto ri = 0; ri < theta.rows(); ri++) {
@@ -690,17 +697,21 @@ namespace nhc {
 
         std::cout << std::setprecision(8);
         out << std::setprecision(8);
-        std::cout << std::scientific << std::setw(20) << r(0, 0) << std::setw(20) << s(0, 0) << std::setw(20)
+        std::cout << std::scientific << std::setw(20) << q(0, 0) << std::setw(20) << s(0, 0) << std::setw(20)
             << cons_energy.sum() << std::setw(20) << prim_kine_estor << std::setw(20) << prim_pote_estor;
-        out << std::scientific << std::setw(20) << r(0, 0) << std::setw(20) << s(0, 0) << std::setw(20)
+        out << std::scientific << std::setw(20) << q(0, 0) << std::setw(20) << s(0, 0) << std::setw(20)
             << cons_energy.sum() << std::setw(20) << prim_kine_estor << std::setw(20) << prim_pote_estor;
+    }
+
+    void nhc_procedure_for_pimd::implement_one_step() {
+        thermo_propagate();
+        physic_propagate();
+        thermo_propagate();
     }
 
     void nhc_procedure_for_pimd::implement() {
         for (double t = 0; t <= bsp.run_time; t += Dt) {
-            thermo_propagate();
-            physic_propagate();
-            thermo_propagate();
+            implement_one_step();
             t += Dt;
         }
     }
@@ -720,9 +731,7 @@ namespace nhc {
         const auto tstart = std::chrono::high_resolution_clock::now();
         do {
             // NHC numerical evolution
-            thermo_propagate();
-            physic_propagate();
-            thermo_propagate();
+            implement_one_step();
             
             if (ctr == bsp.data_coll_peri) {
                 calc_cons_quant();

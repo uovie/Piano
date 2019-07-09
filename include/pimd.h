@@ -8,6 +8,7 @@
 // uovie headers
 #include "simu_para.h"
 #include "mol_geom.h"
+#include "phy_const.h"
 
 namespace uovie {
 namespace pimd {
@@ -15,6 +16,22 @@ namespace pimd {
     // shorthand for physical constants
     constexpr double h_bar = uovie::phy_const::red_Planck_const;
     constexpr double k = uovie::phy_const::Boltzmann_const;
+    
+    class pimd_via_ld {
+    public:
+        pimd_via_ld() = default;
+        pimd_via_ld(std::ofstream& _out, const Global::basic_simu_para& _bsp,
+            const Global::system& _sys, const int _nbead) :
+            out(_out), bsp(_bsp), sys(_sys), nbead(_nbead) { }
+
+        void implement();
+
+    private:
+        std::ofstream& out;
+        const Global::basic_simu_para& bsp;
+        const Global::system& sys;
+        const int nbead;
+    };
     
     class pimd_via_nhc {
     public:

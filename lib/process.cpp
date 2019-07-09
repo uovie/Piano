@@ -42,15 +42,26 @@ void process::read() {
     std::cout << "Read Infomation from " << fn_no_ex + ".vie" << std::endl;
     in >> job;
 
-    if (job == "nhc") {
+    {
         std::string tmp_data;
-        in >> tmp_data;
-        des.push_back(tmp_data);
-    }
-    else if (job == "pimd") {
-        std::string tmp_data;
-        in >> tmp_data;
-        des.push_back(tmp_data);
+        if (job == "ld") {
+            in >> tmp_data;
+            des.push_back(tmp_data);
+        }
+        else if (job == "at") {
+            in >> tmp_data;
+            des.push_back(tmp_data);
+        }
+        else if (job == "nhc") {
+            for (int i = 0; i < 2; i++) {
+                in >> tmp_data;
+                des.push_back(tmp_data);
+            }
+        }
+        else if (job == "pimd") {
+            in >> tmp_data;
+            des.push_back(tmp_data);
+        }
     }
 
     in >> bsp.run_time >> bsp.step_size >> bsp.data_coll_peri;

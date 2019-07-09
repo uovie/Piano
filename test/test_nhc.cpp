@@ -6,7 +6,6 @@
 // uovie headers
 #include "process.h"
 #include "simu_para.h"
-#include "phy_const.h"
 #include "thermostat/nhc.h"
 
 using namespace uovie;
@@ -32,7 +31,7 @@ int main(int argc, char* argv[])
     /*** NHC Simulation Execution                           ***/
     /*** ================================================== ***/
 
-    thermostat::nhc::nhc_procedure_local nhc_proce(simulation.bsp,
+    thermostat::nhc::nhc_procedure_local_side nhc_proce(simulation.bsp,
         simulation.sys, tfs, 4);
     nhc_proce.implement(simulation.out);
 

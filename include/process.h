@@ -17,7 +17,6 @@ namespace Global {
     public:
         std::string fn_no_ex; // filename no extension
         std::ifstream in;
-        std::ofstream out;
         std::string job;
         std::vector<std::string> des; // job description
         basic_simu_para bsp;
@@ -25,8 +24,6 @@ namespace Global {
 
         void open(const std::string& filename);
         void read();
-        void print();
-        void close();
     };
     
 } // !Global

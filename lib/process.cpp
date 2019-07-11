@@ -10,12 +10,6 @@
 #include "phy_const.h"
 #include "atom_data.h"
 
-#ifndef PHY_CONST_SHORTHAND
-#define PHY_CONST_SHORTHAND
-constexpr double h_bar = uovie::phy_const::red_Planck_const;
-constexpr double k = uovie::phy_const::Boltzmann_const;
-#endif // !PHY_CONST_SHORTHAND
-
 using namespace uovie::Global;
 
 void process::open(const std::string& filename) {
@@ -32,12 +26,11 @@ void process::open(const std::string& filename) {
 
     for (auto it = filename.begin(); it != filename.end() - 4; it++)
         fn_no_ex += *it;
-
-    // open output file
-    out.open(fn_no_ex + ".out");
 }
 
 void process::read() {
+
+    constexpr double k = uovie::phy_const::Boltzmann_const;
 
     std::cout << "Read Infomation from " << fn_no_ex + ".vie" << std::endl;
     in >> job;
@@ -59,12 +52,18 @@ void process::read() {
             }
         }
         else if (job == "pimd") {
-            in >> tmp_data;
-            des.push_back(tmp_data);
+            for (int i = 0; i < 2; i++) {
+                in >> tmp_data;
+                des.push_back(tmp_data);
+            }
         }
     }
 
     in >> bsp.run_time >> bsp.step_size >> bsp.data_coll_peri;
+
+    bsp.run_time *= 1e-15 / uovie::phy_const::a_u_time;
+    bsp.step_size *= 1e-15 / uovie::phy_const::a_u_time;
+
     in >> sys.dimension >> sys.volume >> sys.temperature >> sys.pressure;
     in >> sys.model_type;
 
@@ -132,18 +131,10 @@ void process::read() {
         }
     }
 
+    in.close(); // close files
+
     sys.num_part = 0;
     for (auto mi = 0; mi < sys.molecules.size(); mi++)
         sys.num_part += sys.molecules[mi].atoms.size();
 
-}
-
-void process::print() {
-    std::cout << "\nNormal termination. Congratulations!" << std::endl;
-}
-
-void process::close() {
-    // close files
-    in.close();
-    out.close();
 }

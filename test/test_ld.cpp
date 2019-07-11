@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
     /*** LD Simulation Execution                            ***/
     /*** ================================================== ***/
 
-    thermostat::ld::ld_procedure_side ld_proce(simulation.bsp, simulation.sys, 1);
+    thermostat::ld::ld_side ld_proce(simulation.bsp, simulation.sys, 1);
     ld_proce.implement(simulation.out);
 
     /*** ================================================== ***/

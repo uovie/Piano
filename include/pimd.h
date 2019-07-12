@@ -30,16 +30,17 @@ namespace pimd {
     public:
         pimd_base() = default;
         pimd_base(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead) :
+            const Global::system& _sys, const int _nbead) :
             fn_no_ex(_fn_no_ex), bsp(_bsp), sys(_sys), nbead(_nbead) { }
+        ~pimd_base() = default;
 
-        void implement();
+        virtual void implement();
 
     protected:
         const std::string& fn_no_ex;
         const Global::basic_simu_para& bsp;
         const Global::system& sys;
-        const int& nbead;
+        const int nbead;
 
         const double& Dt = bsp.step_size;
         const int& d = sys.dimension;
@@ -57,8 +58,8 @@ namespace pimd {
         Eigen::ArrayXXd s;          // fictitious momentum
         Eigen::ArrayXXd F;          // fictitious force
 
-        Eigen::ArrayXXd kin_ene;
-        Eigen::ArrayXXd pot_ene;
+        double kin_ene = 0;
+        double pot_ene = 0;
 
         double prim_kin_estor = 0;
         double prim_pot_estor = 0;
@@ -82,18 +83,18 @@ namespace pimd {
     //--------------------------------------------------------//
 
     /*** ================================================== ***/
-    /*** PIMD procedure via LD (Base)                     ***/
+    /*** PIMD procedure via LD (Base)                       ***/
     /*** ================================================== ***/
 
     class pimd_via_ld_base : public pimd_base {
     public:
         pimd_via_ld_base() = default;
         pimd_via_ld_base(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead, const double& _gamma):
+            const Global::system& _sys, const int _nbead, const double _gamma):
             pimd_base(_fn_no_ex, _bsp, _sys, _nbead), gamma(_gamma) { }
 
     protected:
-        const double& gamma;    // friction coefficient
+        const double gamma;    // friction coefficient
 
         Eigen::ArrayXXd nrand;
         std::vector<std::mt19937> mtes;
@@ -111,7 +112,7 @@ namespace pimd {
     public:
         pimd_via_ld_side() = default;
         pimd_via_ld_side(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead, const double& _gamma) :
+            const Global::system& _sys, const int _nbead, const double _gamma) :
             pimd_via_ld_base(_fn_no_ex, _bsp, _sys, _nbead, _gamma)
         {
             labels.push_back("LD");
@@ -133,7 +134,7 @@ namespace pimd {
     public:
         pimd_via_ld_middle() = default;
         pimd_via_ld_middle(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead, const double& _gamma) :
+            const Global::system& _sys, const int _nbead, const double _gamma) :
             pimd_via_ld_base(_fn_no_ex, _bsp, _sys, _nbead, _gamma)
         {
             labels.push_back("LD");
@@ -157,11 +158,11 @@ namespace pimd {
     public:
         pimd_via_at_base() = default;
         pimd_via_at_base(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead, const double& _nu) :
+            const Global::system& _sys, const int _nbead, const double _nu) :
             pimd_base(_fn_no_ex, _bsp, _sys, _nbead), nu(_nu) { }
 
     protected:
-        const double& nu;
+        const double nu;
 
         Eigen::ArrayXXd nrand;
         Eigen::ArrayXXd urand;
@@ -183,7 +184,7 @@ namespace pimd {
     public:
         pimd_via_at_side() = default;
         pimd_via_at_side(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead, const double& _nu) :
+            const Global::system& _sys, const int _nbead, const double _nu) :
             pimd_via_at_base(_fn_no_ex, _bsp, _sys, _nbead, _nu)
         {
             labels.push_back("AT");
@@ -192,7 +193,7 @@ namespace pimd {
 
     private:
         const double cri = 1 - exp(-nu * Dt / 2);
-        void implement_one_step();
+        void implement_one_step() override;
     };
 
     /*** ================================================== ***/
@@ -203,7 +204,7 @@ namespace pimd {
     public:
         pimd_via_at_middle() = default;
         pimd_via_at_middle(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead, const double& _nu) :
+            const Global::system& _sys, const int _nbead, const double _nu) :
             pimd_via_at_base(_fn_no_ex, _bsp, _sys, _nbead, _nu)
         {
             labels.push_back("AT");
@@ -212,7 +213,7 @@ namespace pimd {
 
     private:
         const double cri = 1 - exp(-nu * Dt);
-        void implement_one_step();
+        void implement_one_step() override;
     };
 
     //--------------------------------------------------------//
@@ -225,8 +226,10 @@ namespace pimd {
     public:
         pimd_via_nhc_base() = default;
         pimd_via_nhc_base(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const int& _nbead, const thermostat::nhc::thermo_factor_scheme& _tfs,
+            const Global::system& _sys, const int _nbead, const thermostat::nhc::thermo_factor_scheme& _tfs,
             const int _nchain) : pimd_base(_fn_no_ex, _bsp, _sys, _nbead), tfs(_tfs), nchain(_nchain) { }
+
+        void implement() override;
 
     protected:
         const thermostat::nhc::thermo_factor_scheme& tfs;
@@ -238,10 +241,7 @@ namespace pimd {
         Eigen::ArrayXXd theta;      // extented momentum
         Eigen::ArrayXXd Gamma;      // thermostat force
 
-        Eigen::ArrayXXd kin_ene_arr;
-        Eigen::ArrayXXd pot_ene_arr;
-        Eigen::ArrayXXd the_ene_arr;
-        Eigen::ArrayXXd con_ene_arr;
+        double con_ene = 0;
 
         void initialize() override;
         void calc_thermo_force(const int& j);
@@ -267,7 +267,7 @@ namespace pimd {
         }
 
     private:
-        void implement_one_step();
+        void implement_one_step() override;
     };
 
     /*** ================================================== ***/
@@ -286,7 +286,7 @@ namespace pimd {
         }
 
     private:
-        void implement_one_step();
+        void implement_one_step() override;
     };
 
 } // !pimd

@@ -41,8 +41,8 @@ namespace pimd {
     // calculate physical forces
     void pimd_base::calc_physic_force()
     {
-        Eigen::ArrayXXd pV_pq = Eigen::ArrayXXd::Zero(d * N, nbead); // \frac{\partial V}{\partial q}
-        Eigen::ArrayXXd pV_pr = Eigen::ArrayXXd::Zero(d * N, nbead); // \frac{\partial V}{\partial r}
+        Eigen::ArrayXXd pV_pq = Eigen::ArrayXXd::Zero(dof, nbead); // \frac{\partial V}{\partial q}
+        Eigen::ArrayXXd pV_pr = Eigen::ArrayXXd::Zero(dof, nbead); // \frac{\partial V}{\partial r}
 
         if (sys.model_type == "HO") { // simple harmonic forces
             model::harmonic_oscilator HO(sys.model_para[0]);
@@ -79,21 +79,17 @@ namespace pimd {
 
         if (sys.model_type == "HO") { // simple harmonic forces
             model::harmonic_oscilator HO(sys.model_para[0]);
-            pot_ene = 0.5 * m * pow(HO.ome(), 2) * q.pow(2);
+            pot_ene = 0.5 * pow(HO.ome(), 2) * (m * q.pow(2)).sum();
         }
         else if (sys.model_type == "LJ") { // Lennard_Jones forces
             model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
-            for (auto ci = 0; ci < pot_ene.cols(); ci++) {
-                for (auto ni = 0; ni < N; ni++) {
-                    for (auto nj = 0; nj < N; nj++) {
-                        if (ni == nj) continue;
-                        pot_ene.block(d * ni, ci, d, 1) += LJ.V(q.block(d * ni, ci, d, 1), q.block(d * nj, ci, d, 1));
-                    }
-                }
-            }
-            pot_ene /= 2;
+            pot_ene = 0;
+            for (auto ci = 0; ci < nbead; ci++)
+                for (auto ni = 0; ni < N - 1; ni++)
+                    for (auto nj = ni + 1; nj < N; nj++)
+                        pot_ene += LJ.V(q.block(d * ni, ci, d, 1), q.block(d * nj, ci, d, 1));
         }
-        prim_pot_estor = pot_ene.sum() / nbead;
+        prim_pot_estor = pot_ene / nbead;
 
         //prim_pres_estor = N*nbead/(beta * V)
     }
@@ -128,22 +124,24 @@ namespace pimd {
         const std::chrono::duration<double> time_elapsed = tstop - tstart;
 
         print_conclusion_info(chk, out, time_elapsed);
+        chk.close();
+        out.close();
     }
 
     void pimd_base::print_pimd_proce_title(std::ofstream& chk, std::ofstream& out)
     {
-        std::cout << "PIMD procedure via " + labels[0] + " (" + labels[1] + ") is running." << std::endl;
-        chk << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n   Time" << "            " << "position"
-            << "            " << "momentum" << std::endl;
-        out << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n   Time" << "            " << "prim_kin_estor"
-            << "            " << "prim_pot_estor" << std::endl;
+        std::cout << "\nPIMD procedure via " + labels[0] + " (" + labels[1] + ") is running." << std::endl;
+        chk << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "              position"
+            << "            momentum" << std::endl;
+        out << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "           prim_kin_estor"
+            << "      prim_pot_estor" << std::endl;
     }
 
     void pimd_base::print_pimd_proce_data(std::ofstream& chk, std::ofstream& out, double& t)
     {
-        chk << std::scientific << std::setprecision(8) << std::setw(20) << t
+        chk << std::scientific << std::setprecision(8) << std::setw(20) << t * uovie::phy_const::a_u_time * 1e15
             << std::setw(20) << q(0, 0) << std::setw(20) << s(0, 0) << std::endl;
-        out << std::scientific << std::setprecision(8) << std::setw(20) << t
+        out << std::scientific << std::setprecision(8) << std::setw(20) << t * uovie::phy_const::a_u_time * 1e15
             << std::setw(20) << prim_kin_estor << std::setw(20) << prim_pot_estor << std::endl;
     }
 
@@ -172,9 +170,6 @@ namespace pimd {
         s.resize(dof, nbead);
         F.resize(dof, nbead);
         nrand.resize(dof, nbead);
-
-        kin_ene.resize(dof, nbead);
-        pot_ene.resize(dof, nbead);
 
         // initialize cartisian positions and masses
         int vi = 0;
@@ -226,9 +221,9 @@ namespace pimd {
 
     void pimd_via_ld_base::upd_rand_num()
     {
-        for (int ri = 0; ri < dof; ri++)
-            for (int ci = 0; ci < nbead; ci++)
-                nrand(ri, ci) = nds[ri * dof + ci](mtes[ri * dof + ci]);
+        for (int ci = 0; ci < nbead; ci++)
+            for (int ri = 0; ri < dof; ri++)
+                nrand(ri, ci) = nds[ri + ci * dof](mtes[ri + ci * dof]);
     }
 
     /*** ===================================================== ***/
@@ -253,7 +248,8 @@ namespace pimd {
     /*** PIMD Procedure via LD (Middle) Class Member Functions ***/
     /*** ===================================================== ***/
 
-    void pimd_via_ld_middle::implement_one_step() {
+    void pimd_via_ld_middle::implement_one_step()
+    {
         calc_physic_force();
         s += F * Dt / 2;
         r += s * Dt / (2 * m_tilde);
@@ -285,9 +281,6 @@ namespace pimd {
         F.resize(dof, nbead);
         nrand.resize(dof, nbead);
         urand.resize(dof, nbead);
-
-        kin_ene.resize(dof, nbead);
-        pot_ene.resize(dof, nbead);
 
         // initialize cartisian positions and masses
         int vi = 0;
@@ -347,21 +340,22 @@ namespace pimd {
 
     void pimd_via_at_base::upd_uni_rand_num()
     {
-        for (int ri = 0; ri < dof; ri++)
-            for (int ci = 0; ci < nbead; ci++)
-                urand(ri, ci) = urds[ri * dof + ci](umtes[ri * dof + ci]);
+        for (int ci = 0; ci < nbead; ci++)
+            for (int ri = 0; ri < dof; ri++)
+                urand(ri, ci) = urds[ri + ci * dof](umtes[ri + ci * dof]);
     }
 
     /*** ===================================================== ***/
     /*** PIMD Procedure via AT (Side) Class Member Functions   ***/
     /*** ===================================================== ***/
 
-    void pimd_via_at_side::implement_one_step() {
+    void pimd_via_at_side::implement_one_step()
+    {
         upd_uni_rand_num();
-        for (int ri = 0; ri < dof; ri++) {
-            for (int ci = 0; ci < nbead; ci++) {
+        for (int ci = 0; ci < nbead; ci++) {
+            for (int ri = 0; ri < dof; ri++) {
                 if (urand(ri, ci) < cri) {
-                    nrand(ri, ci) = nds[ri * dof + ci](nmtes[ri * dof + ci]);
+                    nrand(ri, ci) = nds[ri + ci * dof](nmtes[ri + ci * dof]);
                     s(ri, ci) = sqrt(1 / beta) * m_tilde(ri, ci) * nrand(ri, ci);
                 }
             }
@@ -375,10 +369,10 @@ namespace pimd {
         s += F * Dt / 2;
 
         upd_uni_rand_num();
-        for (int ri = 0; ri < dof; ri++) {
-            for (int ci = 0; ci < nbead; ci++) {
+        for (int ci = 0; ci < nbead; ci++) {
+            for (int ri = 0; ri < dof; ri++) {
                 if (urand(ri, ci) < cri) {
-                    nrand(ri, ci) = nds[ri * dof + ci](nmtes[ri * dof + ci]);
+                    nrand(ri, ci) = nds[ri + ci * dof](nmtes[ri + ci * dof]);
                     s(ri, ci) = sqrt(1 / beta) * m_tilde(ri, ci) * nrand(ri, ci);
                 }
             }
@@ -389,16 +383,17 @@ namespace pimd {
     /*** PIMD Procedure via AT (Middle) Class Member Functions ***/
     /*** ===================================================== ***/
 
-    void pimd_via_at_middle::implement_one_step() {
+    void pimd_via_at_middle::implement_one_step()
+    {
         calc_physic_force();
         s += F * Dt / 2;
         r += s * Dt / (2 * m);
 
         upd_uni_rand_num();
-        for (int ri = 0; ri < dof; ri++) {
-            for (int ci = 0; ci < nbead; ci++) {
+        for (int ci = 0; ci < nbead; ci++) {
+            for (int ri = 0; ri < dof; ri++) {
                 if (urand(ri, ci) < cri) {
-                    nrand(ri, ci) = nds[ri * dof + ci](nmtes[ri * dof + ci]);
+                    nrand(ri, ci) = nds[ri + ci * dof](nmtes[ri + ci * dof]);
                     s(ri, ci) = sqrt(1 / beta) * m_tilde(ri, ci) * nrand(ri, ci);
                 }
             }
@@ -431,11 +426,6 @@ namespace pimd {
         eta.resize(dof * M, nbead);
         theta.resize(dof * M, nbead);
         Gamma.resize(dof * M, nbead);
-
-        kin_ene_arr.resize(dof, nbead);
-        pot_ene_arr.resize(dof, nbead);
-        the_ene_arr.resize(dof, nbead);
-        con_ene_arr.resize(dof, nbead);
 
         // initialize cartisian positions and masses
         int vi = 0;
@@ -477,6 +467,8 @@ namespace pimd {
         // initialize extented masses and extented momenta
         std::mt19937 theta_mte(rd());
         double tau = 1;
+        if (sys.model_type == "LJ")
+            tau = 5.16767166e4;
         mu = k * T * pow(tau, 2) * Eigen::ArrayXXd::Constant(d * N * M, nbead, 1);
         for (auto ri = 0; ri < theta.rows(); ri++) {
             for (auto ci = 0; ci < theta.cols(); ci++) {
@@ -501,48 +493,80 @@ namespace pimd {
 
     void pimd_via_nhc_base::calc_cons_quant()
     {
-        kin_ene_arr = s.pow(2) / (2 * m_tilde);
+        kin_ene = (s.pow(2) / (2 * m_tilde)).sum();
 
-        pot_ene_arr.setZero();
         if (sys.model_type == "HO") { // harmonic oscillator
             model::harmonic_oscilator HO(sys.model_para[0]);
-            pot_ene_arr = 0.5 * m * pow(HO.ome(), 2) * q.pow(2);
+            pot_ene = 0.5 * pow(HO.ome(), 2) * (m * q.pow(2)).sum();
         }
         else if (sys.model_type == "LJ") { // Lennard_Jones
             model::Lennard_Jones LJ(sys.model_para[0], sys.model_para[1]);
-            for (auto ci = 0; ci < pot_ene_arr.cols(); ci++) {
-                for (auto ni = 0; ni < N; ni++) {
-                    for (auto nj = 0; nj < N; nj++) {
-                        if (ni == nj) continue;
-                        pot_ene_arr.block(d * ni, ci, d, 1) += LJ.V(q.block(d * ni, ci, d, 1), q.block(d * nj, ci, d, 1));
-                    }
-                }
-            }
-            pot_ene_arr /= 2 * d;
+            pot_ene = 0;
+            for (auto ci = 0; ci < nbead; ci++)
+                for (auto ni = 0; ni < N - 1; ni++)
+                    for (auto nj = ni + 1; nj < N; nj++)
+                        pot_ene += LJ.V(q.block(d * ni, ci, d, 1), q.block(d * nj, ci, d, 1));
         }
-        pot_ene_arr = 0.5 * m_bar * pow(fic_omega, 2) * r.pow(2) + pot_ene_arr / nbead;
 
-        the_ene_arr.setZero();
+        double the_ene = 0;
+        Eigen::ArrayXXd the_ene_arr = Eigen::ArrayXXd::Zero(dof, nbead);
         for (int j = 0; j < M; j++)
             the_ene_arr += theta.block(j * dof, 0, dof, nbead).pow(2) / (2 * mu.block(j * dof, 0, dof, nbead))
             + k * T * eta.block(j * dof, 0, dof, nbead);
+        the_ene = the_ene_arr.sum();
 
-        con_ene_arr = kin_ene_arr + pot_ene_arr + the_ene_arr;
+        con_ene = kin_ene + 0.5 * pow(fic_omega, 2) * (m_bar * r.pow(2)).sum() + pot_ene / nbead + the_ene;
+    }
+
+    void pimd_via_nhc_base::implement()
+    {
+        initialize();
+
+        double t = 0;
+        int ctr = 0;
+
+        std::ofstream chk, out;
+        chk.open(fn_no_ex + ".chk");
+        out.open(fn_no_ex + ".out");
+
+        print_pimd_proce_title(chk, out);
+        calc_prim_estor();
+        calc_cons_quant();
+        print_pimd_proce_data(chk, out, t);
+
+        const auto tstart = std::chrono::high_resolution_clock::now();
+        do {
+            implement_one_step();
+            if (ctr == bsp.data_coll_peri) {
+                calc_prim_estor();
+                calc_cons_quant();
+                print_pimd_proce_data(chk, out, t);
+                ctr = 0;
+            }
+            ctr++;
+            t += Dt;
+        } while (t <= bsp.run_time);
+        const auto tstop = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> time_elapsed = tstop - tstart;
+
+        print_conclusion_info(chk, out, time_elapsed);
+        chk.close();
+        out.close();
     }
 
     void pimd_via_nhc_base::print_pimd_proce_title(std::ofstream& chk, std::ofstream& out)
     {
         std::cout << "PIMD procedure via " + labels[0] + " (" + labels[1] + ") is running." << std::endl;
-        chk << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n   Time" << "            " << "position"
-            << "            " << "momentum" << "            " << "con_ene" << std::endl;
-        out << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n   Time" << "            " << "prim_kin_estor"
-            << "            " << "prim_pot_estor" << std::endl;
+        chk << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "              position"
+            << "            momentum" << "            con_ene" << std::endl;
+        out << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "           prim_kin_estor"
+            << "      prim_pot_estor" << std::endl;
     }
 
     void pimd_via_nhc_base::print_pimd_proce_data(std::ofstream& chk, std::ofstream& out, double& t)
     {
         chk << std::scientific << std::setprecision(8) << std::setw(20) << t
-            << std::setw(20) << q(0, 0) << std::setw(20) << s(0, 0) << std::setw(20) << con_ene_arr.sum() << std::endl;
+            << std::setw(20) << q(0, 0) << std::setw(20) << s(0, 0) << std::setw(20) << con_ene << std::endl;
         out << std::scientific << std::setprecision(8) << std::setw(20) << t
             << std::setw(20) << prim_kin_estor << std::setw(20) << prim_pot_estor << std::endl;
     }

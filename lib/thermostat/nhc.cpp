@@ -19,20 +19,57 @@ namespace nhc {
     /*** NHC Procedure (Base) Class Member Functions           ***/
     /*** ===================================================== ***/
 
+    void nhc_base::implement()
+    {
+        initialize();
+
+        double t = 0;
+        int ctr = 0;
+
+        std::ofstream chk, out;
+        chk.open(fn_no_ex + ".chk");
+        out.open(fn_no_ex + ".out");
+
+        print_ther_proce_title(chk, out);
+        calc_physic_energy();
+        calc_cons_quant();
+        print_ther_proce_data(chk, out, t);
+
+        const auto tstart = std::chrono::high_resolution_clock::now();
+        do {
+            implement_one_step();
+            if (ctr == bsp.data_coll_peri) {
+                calc_physic_energy();
+                calc_cons_quant();
+                print_ther_proce_data(chk, out, t);
+                ctr = 0;
+            }
+            ctr++;
+            t += Dt;
+        } while (t <= bsp.run_time);
+        const auto tstop = std::chrono::high_resolution_clock::now();
+        const std::chrono::duration<double> time_elapsed = tstop - tstart;
+
+        print_conclusion_info(chk, out, time_elapsed);
+
+        chk.close();
+        out.close();
+    }
+
     void nhc_base::print_ther_proce_title(std::ofstream& chk, std::ofstream& out)
     {
-        std::cout << labels[0] + " procedure (" + labels[1] + ", " + labels[2] + ") is running." << std::endl;
-        chk << labels[0] + " procedure (" + labels[1] + ", " + labels[2] + "):\n   Time" << "            " << "position"
-            << "            " << "momentum" << "            " << "con_ene" << std::endl;
-        out << labels[0] + " procedure (" + labels[1] + ", " + labels[2] + "):\n   Time" << "            " << "kin_ene"
-            << "            " << "pot_ene" << std::endl;
+        std::cout << "\n" + labels[0] + " procedure (" + labels[1] + ", " + labels[2] + ") is running." << std::endl;
+        chk << labels[0] + " procedure (" + labels[1] + ", " + labels[2] + "):\n" << "           Time" << "              position"
+            << "            momentum" << "            con_ene" << std::endl;
+        out << labels[0] + " procedure (" + labels[1] + ", " + labels[2] + "):\n" << "           Time" << "              kin_ene"
+            << "             pot_ene" << std::endl;
     }
 
     void nhc_base::print_ther_proce_data(std::ofstream& chk, std::ofstream& out, double& t)
     {
-        chk << std::scientific << std::setprecision(8) << std::setw(20) << t
+        chk << std::scientific << std::setprecision(8) << std::setw(20) << t * uovie::phy_const::a_u_time * 1e15
             << std::setw(20) << q(0) << std::setw(20) << p(0) << std::setw(20) << con_ene << std::endl;
-        out << std::scientific << std::setprecision(8) << std::setw(20) << t
+        out << std::scientific << std::setprecision(8) << std::setw(20) << t * uovie::phy_const::a_u_time * 1e15
             << std::setw(20) << kin_ene << std::setw(20) << pot_ene << std::endl;
     }
 
@@ -89,6 +126,8 @@ namespace nhc {
         //    model::harmonic_oscilator HO(sys.model_para[0]);
         //    double tau = 1 / HO.ome();
         double tau = 1;
+        if (sys.model_type == "LJ")
+            tau = 5.16767166e4;
         mu = k * T * pow(tau, 2) * Eigen::ArrayXd::Constant(M, 1);
         for (auto j = 0; j < M; j++) {
             std::normal_distribution<double> ndrm{ 0, sqrt(k * T * mu(j)) };
@@ -127,6 +166,7 @@ namespace nhc {
             }
         }
 
+        double the_ene = 0;
         the_ene = pow(theta(0), 2) / (2 * mu(0)) + d * N * k * T * eta(0);
         for (int j = 1; j < M; j++)
             the_ene += pow(theta(j), 2) / (2 * mu(j)) + k * T * eta(j);
@@ -335,6 +375,7 @@ namespace nhc {
             }
         }
 
+        double the_ene = 0;
         the_ene = (theta.pow(2) / (2 * mu) + k * T * eta).sum();
 
         con_ene = kin_ene + pot_ene + the_ene;

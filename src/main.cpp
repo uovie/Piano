@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
                 pimd_proce.implement();
             }
             if (simulation.des[1] == "middle") {
-                pimd::pimd_via_ld_middle pimd_proce(simulation.fn_no_ex, simulation.bsp, simulation.sys, 8, 1);
+                pimd::pimd_via_ld_middle pimd_proce(simulation.fn_no_ex, simulation.bsp, simulation.sys, 8, 2.41888433e-5);
                 pimd_proce.implement();
             }
         }

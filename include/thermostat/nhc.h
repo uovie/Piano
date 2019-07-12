@@ -63,13 +63,16 @@ namespace nhc {
             const Global::system& _sys, const thermo_factor_scheme& _tfs, const int _nchain) :
             thermostat_base(_fn_no_ex, _bsp, _sys), tfs(_tfs), nchain(_nchain) { }
 
+        void implement() override;
+
     protected:
         const thermo_factor_scheme& tfs;
         const int nchain;   // extented dimension
         const int& M = nchain;
 
-        double the_ene = 0;
         double con_ene = 0;
+
+        virtual void calc_cons_quant() = 0;
 
         void print_ther_proce_title(std::ofstream& chk, std::ofstream& out) override;
         void print_ther_proce_data(std::ofstream& chk, std::ofstream& out, double& t) override;
@@ -98,7 +101,7 @@ namespace nhc {
 
         void initialize() override;
         void calc_thermo_force(const int& j);
-        void calc_cons_quant();
+        void calc_cons_quant() override;
     };
 
     /*** ================================================== ***/
@@ -162,7 +165,7 @@ namespace nhc {
 
         void initialize() override;
         void calc_thermo_force(const int& j);
-        void calc_cons_quant();
+        void calc_cons_quant() override;
     };
 
     /*** ================================================== ***/

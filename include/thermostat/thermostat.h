@@ -32,7 +32,7 @@ namespace thermostat {
         thermostat_base(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
             const Global::system& _sys) : fn_no_ex(_fn_no_ex), bsp(_bsp), sys(_sys) { }
 
-        void implement();
+        virtual void implement();
 
     protected:
         const std::string& fn_no_ex;
@@ -56,6 +56,7 @@ namespace thermostat {
 
         virtual void initialize() = 0;
         void calc_physic_force();
+        virtual void calc_physic_energy();
         virtual void implement_one_step() = 0;
 
         std::vector<std::string> labels;

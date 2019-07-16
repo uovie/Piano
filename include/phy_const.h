@@ -50,7 +50,7 @@ namespace phy_const {
     constexpr auto atomic_ener_const = 1.492418062e-10; // ("atomic energy constant", "mu", 1.492418062e-10, "J", 1.2e-8)
     constexpr auto Faraday_const = 96485.33289; // ("Faraday constant", "F", 96485.33289, "C mol-1" 6.2e-9)
     /* ... */
-    constexpr auto Boltzmann_const = 1/*1.38064852e-23*/; // ("Boltzmann constant", "k", 1.38064852e-23, "J K-1", 5.7e-7);
+    constexpr auto Boltzmann_const = 1.38064852e-23; // ("Boltzmann constant", "k", 1.38064852e-23, "J K-1", 5.7e-7);
 
 
     /* V

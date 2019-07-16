@@ -89,9 +89,9 @@ namespace thermostat {
     void thermostat_base::print_ther_proce_title(std::ofstream& chk, std::ofstream& out)
     {
         std::cout << "\n" + labels[0] + " procedure (" + labels[1] + ") is running." << std::endl;
-        chk << labels[0] + " procedure (" + labels[1] + "):\n" << "           Time" << "              position"
+        chk << "# " + labels[0] + " procedure (" + labels[1] + "):\n" << "#          Time" << "              position"
             << "            momentum" << std::endl;
-        out << labels[0] + " procedure (" + labels[1] + "):\n" << "           Time" << "              kin_ene"
+        out << "# " + labels[0] + " procedure (" + labels[1] + "):\n" << "#          Time" << "              kin_ene"
             << "             pot_ene" << std::endl;
     }
 
@@ -105,8 +105,8 @@ namespace thermostat {
 
     void thermostat_base::print_conclusion_info(std::ofstream& chk, std::ofstream& out,
         const std::chrono::duration<double>& time_elap) {
-        chk << "\nElapsed time of " + labels[0] + " procedure (" + labels[1] + "): " << time_elap.count() << std::endl;
-        out << "\nElapsed time of " + labels[0] + " procedure (" + labels[1] + "): " << time_elap.count() << std::endl;
+        chk << "\n# Elapsed time of " + labels[0] + " procedure (" + labels[1] + "): " << time_elap.count() << std::endl;
+        out << "\n# Elapsed time of " + labels[0] + " procedure (" + labels[1] + "): " << time_elap.count() << std::endl;
         std::cout << "\nElapsed time of " + labels[0] + " procedure (" + labels[1] + "): " << time_elap.count() << std::endl;
         std::cout << "\nNormal termination. Congratulations!" << std::endl;
     }

@@ -1,0 +1,159 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{geometry}
+\usepackage{fontspec}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{braket}
+\usepackage{IEEEtrantools}
+\usepackage[T1]{fontenc}
+\usepackage[cmintegrals]{newtxmath}
+\usepackage{bm}
+
+\geometry{a4paper,left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+
+\setmainfont{Times New Roman}
+\setsansfont{DejaVu Sans}
+\setmonofont{Latin Modern Mono}
+
+% define the title
+\title{Nosé–Hoover Chains}
+\author{Haoyu Lin}
+\date{\today}
+
+\bibliographystyle{plain}
+\begin{document}
+
+	% generates the title
+	\maketitle
+	
+	% insert the table of contents
+	\tableofcontents
+	
+	\section{Introduction}
+	Well, and here begins my lovely article. \cite{article-minimal}
+	
+	\section{Numerical integrating the Nosé–Hoover chain equations}
+	the thermostat forces in eqn.(4.11.6) vary rapidly \\
+	employing a higher-order factorization \\
+	
+	\subsection{Suzuki–Yoshida scheme}
+	$$\sum_{\alpha=1}^{n_{\mathrm{sy}}} w_{\alpha}=1$$
+	\begin{enumerate}
+		\item You can nest the list
+		environments to your taste:
+		\begin{itemize}
+			\item fourth-order scheme
+			\[
+			\begin{aligned}
+			w_{1} =& w_{3}=\frac{1}{2-2^{1 / 3}}
+			w_{2} =& 1-w_{1}-w_{3}.
+			\end{aligned}
+			\]
+			\item sixth-order scheme
+			\[
+			\begin{aligned}
+			w_{1} =& w_{7}=0.784513610477560 \\
+			w_{2} =& w_{6}=0.235573213359357 \\
+			w_{3} =& w_{5}=-1.1767998417887 \\
+			w_{4} =& 1-w_{1}-w_{2}-w_{3}-w_{5}-w_{6}-w_{6}-w_{7}-w_{7}. \end{aligned}
+			\]
+		\end{itemize}
+		\item Therefore remember:
+%		\begin{description}
+%			\item[Stupid] things will not
+%			become smart because they are
+%			in a list.
+%			\item[Smart] things, though,
+%			can be presented beautifully
+%			in a list.
+%		\end{description}
+	\end{enumerate}
+
+	Using the Suzuki–Yoshida scheme allows the propagator in eqn. (4.11.8) to be written as
+	$$\mathrm{e}^{i L \Delta t} \approx \prod_{\beta=1}^{n_{\mathrm{sy}}}\left[S\left(w_{\beta} \Delta t / 2 n\right)\right]^{n} \mathrm{e}^{i L_{2} \Delta t / 2} \mathrm{e}^{i L_{1} \Delta t} \mathrm{e}^{i L_{2} \Delta t / 2} \prod_{\alpha=1}^{n_{\mathrm{sy}}}\left[S\left(w_{\alpha} \Delta t / 2 n\right)\right]^{n}$$
+	
+	
+	One scheme in particular, due to Suzuki(1991a, 1991b) and Yoshida(1990), has proved particularly useful for the Nosé–Hoover chain system.
+	
+	
+	\ldots{} and here it ends.
+	
+	\section{Numerical evolution}
+	\[
+	\begin{aligned}
+	\exp \left(c x \frac{\partial}{\partial x}\right) f(x) =& \left[\sum_{m=0}^{\infty} \frac{c^{m}}{m !}\left(x \frac{\partial}{\partial x}\right)^{m}\right] \left[\sum_{n=0}^{\infty} \frac{f^{(n)}(0)}{n !} x^{n}\right] \\
+	=& \sum_{n=0}^{\infty} \frac{f^{(n)}(0)}{n !} \sum_{m=0}^{\infty} \frac{n! c^{m} x^{n-m}}{m! (n-m)!} \\
+	=& f(x \mathrm{e}^{c})
+	\end{aligned}
+	\]
+	
+	Here, we show the approximated numerical evolution in detail. The classical propagator in a single step is
+	
+		$$\mathrm{e}^{i L \Delta t} \approx \prod_{\beta=1}^{n_{\mathrm{sy}}}\left[S\left(w_{\beta} \Delta t / 2 n\right)\right]^{n} \mathrm{e}^{i L_{2} \Delta t / 2} \mathrm{e}^{i L_{1} \Delta t} \mathrm{e}^{i L_{2} \Delta t / 2} \prod_{\alpha=1}^{n_{\mathrm{sy}}}\left[S\left(w_{\alpha} \Delta t / 2 n\right)\right]^{n}.$$
+	
+	\[\exp \left( {\frac{{{w_\alpha }\Delta t}}{{4n}}{F_{\eta ,M}}\frac{\partial }{{\partial {p_{\eta ,M}}}}} \right)\left( {\begin{array}{*{20}{c}}
+		\vdots  \\ 
+		{{p_{\eta ,M}}} \\ 
+		\vdots  
+		\end{array}} \right) = \left( {\begin{array}{*{20}{c}}
+		\vdots  \\ 
+		{{p_{\eta ,M}} + \frac{{{w_\alpha }\Delta t}}{{4n}}{F_{\eta ,M}}} \\ 
+		\vdots  
+		\end{array}} \right)
+	\]
+	
+	\[
+	\begin{aligned}
+    &\exp \left( { - \frac{{{\delta _\alpha }}}{8}\frac{{{p_{\eta ,j + 1}}}}{{{m_{\eta ,j + 1}}}}{p_{\eta ,j}}\frac{\partial }{{\partial {p_{\eta ,j}}}}} \right)\exp \left( {\frac{{{\delta _\alpha }}}{4}{F_{\eta ,j}}\frac{\partial }{{\partial {p_{\eta ,j}}}}} \right)\exp \left( { - \frac{{{\delta _\alpha }}}{8}\frac{{{p_{\eta ,j + 1}}}}{{{m_{\eta ,j + 1}}}}{p_{\eta ,j}}\frac{\partial }{{\partial {p_{\eta ,j}}}}} \right)\left( {\begin{array}{*{20}{c}}
+    	\vdots  \\ 
+    	{{p_{\eta ,j}}} \\ 
+    	\vdots  
+    	\end{array}} \right) \hfill \\
+    =& \exp \left( { - \frac{{{\delta _\alpha }}}{8}\frac{{{p_{\eta ,j + 1}}}}{{{m_{\eta ,j + 1}}}}{p_{\eta ,j}}\frac{\partial }{{\partial {p_{\eta ,j}}}}} \right)\exp \left( {\frac{{{\delta _\alpha }}}{4}{F_{\eta ,j}}\frac{\partial }{{\partial {p_{\eta ,j}}}}} \right)\left( {\begin{array}{*{20}{c}}
+    	\vdots  \\ 
+    	{{p_{\eta ,j}}\exp \left( { - \frac{{{\delta _\alpha }}}{8}\frac{{{p_{\eta ,j + 1}}}}{{{m_{\eta ,j + 1}}}}} \right)} \\ 
+    	\vdots  
+    	\end{array}} \right) \hfill \\
+    =& \exp \left( { - \frac{{{\delta _\alpha }}}{8}\frac{{{p_{\eta ,j + 1}}}}{{{m_{\eta ,j + 1}}}}{p_{\eta ,j}}\frac{\partial }{{\partial {p_{\eta ,j}}}}} \right)\left( {\begin{array}{*{20}{c}}
+    	\vdots  \\ 
+    	{{p_{\eta ,j}}\exp \left( { - \frac{{{\delta _\alpha }}}{8}\frac{{{p_{\eta ,j + 1}}}}{{{m_{\eta ,j + 1}}}}} \right) + \frac{{{\delta _\alpha }}}{4}{F_{\eta ,j}}} \\ 
+    	\vdots  
+    	\end{array}} \right) \hfill \\
+    =& \left( {\begin{array}{*{20}{c}}
+    	\vdots  \\ 
+    	{{p_{\eta ,j}}\exp \left( { - \frac{{{\delta _\alpha }}}{4}\frac{{{p_{\eta ,j + 1}}}}{{{m_{\eta ,j + 1}}}}} \right) + \frac{{{\delta _\alpha }}}{4}{F_{\eta ,j}}} \\ 
+    	\vdots  
+    	\end{array}} \right) \hfill \\  
+	\end{aligned}
+	\]
+	
+	\[
+	\exp \left( { - \frac{{{\delta _\alpha }}}{2}\frac{{{p_{\eta ,j}}}}{{{m_{\eta ,j}}}}\frac{\partial }{{\partial {r_{\eta ,j}}}}} \right)\left( {\begin{array}{*{20}{c}}
+		\vdots  \\ 
+		{{r_{\eta ,j}}} \\ 
+		\vdots  
+		\end{array}} \right) = \left( {\begin{array}{*{20}{c}}
+		\vdots  \\ 
+		{{r_{\eta ,j}} - \frac{{{\delta _\alpha }}}{2}\frac{{{p_{\eta ,j}}}}{{{m_{\eta ,j}}}}} \\ 
+		\vdots  
+		\end{array}} \right)
+	\]
+	
+	\[
+	\exp \left( { - \frac{{{\delta _\alpha }}}{2}\frac{{{p_{\eta ,1}}}}{{{m_{\eta ,1}}}}{p_i} \cdot \frac{\partial }{{\partial {p_i}}}} \right)\left( {\begin{array}{*{20}{c}}
+		\vdots  \\ 
+		{{p_i}} \\ 
+		\vdots  
+		\end{array}} \right) = \left( {\begin{array}{*{20}{c}}
+		\vdots  \\ 
+		{{p_i}\exp \left( { - \frac{{{\delta _\alpha }}}{2}\frac{{{p_{\eta ,1}}}}{{{m_{\eta ,1}}}}} \right)} \\ 
+		\vdots  
+		\end{array}} \right)
+	\]
+	
+	
+	\bibliography{QMD.bib}
+	
+\end{document}

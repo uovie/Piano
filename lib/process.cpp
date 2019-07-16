@@ -65,6 +65,9 @@ void process::read() {
     bsp.step_size *= 1e-15 / uovie::phy_const::a_u_time;
 
     in >> sys.dimension >> sys.volume >> sys.temperature >> sys.pressure;
+
+    sys.temperature /= phy_const::a_u_energy;
+
     in >> sys.model_type;
 
     if (sys.model_type == "HO") {

@@ -33,7 +33,7 @@ namespace at {
             thermostat_base(_fn_no_ex, _bsp, _sys), nu(_nu) { }
 
     protected:
-        const double& nu;
+        const double nu;
 
         Eigen::ArrayXd nrand;
         Eigen::ArrayXd urand;
@@ -55,7 +55,7 @@ namespace at {
     public:
         at_side() = default;
         at_side(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const double& _nu):
+            const Global::system& _sys, const double _nu):
             at_base(_fn_no_ex, _bsp, _sys, _nu)
         {
             labels.push_back("AT");
@@ -75,7 +75,7 @@ namespace at {
     public:
         at_middle() = default;
         at_middle(const std::string& _fn_no_ex, const Global::basic_simu_para& _bsp,
-            const Global::system& _sys, const double& _nu) :
+            const Global::system& _sys, const double _nu) :
             at_base(_fn_no_ex, _bsp, _sys, _nu)
         {
             labels.push_back("AT");

@@ -131,9 +131,9 @@ namespace pimd {
     void pimd_base::print_pimd_proce_title(std::ofstream& chk, std::ofstream& out)
     {
         std::cout << "\nPIMD procedure via " + labels[0] + " (" + labels[1] + ") is running." << std::endl;
-        chk << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "              position"
+        chk << "# PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "#          Time" << "              position"
             << "            momentum" << std::endl;
-        out << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "           prim_kin_estor"
+        out << "# PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "#          Time" << "           prim_kin_estor"
             << "      prim_pot_estor" << std::endl;
     }
 
@@ -147,8 +147,8 @@ namespace pimd {
 
     void pimd_base::print_conclusion_info(std::ofstream& chk, std::ofstream& out,
         const std::chrono::duration<double>& time_elap) {
-        chk << "\nElapsed time of PIMD procedure via " + labels[0] + " (" + labels[1] + "): " << time_elap.count() << std::endl;
-        out << "\nElapsed time of PIMD procedure via " + labels[0] + " (" + labels[1] + "): " << time_elap.count() << std::endl;
+        chk << "\n# Elapsed time of PIMD procedure via " + labels[0] + " (" + labels[1] + "): " << time_elap.count() << std::endl;
+        out << "\n# Elapsed time of PIMD procedure via " + labels[0] + " (" + labels[1] + "): " << time_elap.count() << std::endl;
         std::cout << "\nElapsed time of PIMD procedure via " + labels[0] + " (" + labels[1] + "): " << time_elap.count() << std::endl;
         std::cout << "\nNormal termination. Congratulations!" << std::endl;
     }
@@ -556,18 +556,18 @@ namespace pimd {
 
     void pimd_via_nhc_base::print_pimd_proce_title(std::ofstream& chk, std::ofstream& out)
     {
-        std::cout << "PIMD procedure via " + labels[0] + " (" + labels[1] + ") is running." << std::endl;
-        chk << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "              position"
+        std::cout << "\nPIMD procedure via " + labels[0] + " (" + labels[1] + ") is running." << std::endl;
+        chk << "# PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "#          Time" << "              position"
             << "            momentum" << "            con_ene" << std::endl;
-        out << "PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "           Time" << "           prim_kin_estor"
+        out << "# PIMD procedure via " + labels[0] + " (" + labels[1] + "):\n" << "#          Time" << "           prim_kin_estor"
             << "      prim_pot_estor" << std::endl;
     }
 
     void pimd_via_nhc_base::print_pimd_proce_data(std::ofstream& chk, std::ofstream& out, double& t)
     {
-        chk << std::scientific << std::setprecision(8) << std::setw(20) << t
+        chk << std::scientific << std::setprecision(8) << std::setw(20) << t * uovie::phy_const::a_u_time * 1e15
             << std::setw(20) << q(0, 0) << std::setw(20) << s(0, 0) << std::setw(20) << con_ene << std::endl;
-        out << std::scientific << std::setprecision(8) << std::setw(20) << t
+        out << std::scientific << std::setprecision(8) << std::setw(20) << t * uovie::phy_const::a_u_time * 1e15
             << std::setw(20) << prim_kin_estor << std::setw(20) << prim_pot_estor << std::endl;
     }
 
